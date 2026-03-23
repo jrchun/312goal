@@ -324,10 +324,11 @@ Object.keys(MEMBERS).forEach(id => {
 
   const diff = pct - yrPct;
   const cmp = document.getElementById(`cmp-${id}`);
+  const diffCount = Math.round(Math.abs(diff) / 100 * d.total);
   if (diff >= 0) {
-    cmp.innerHTML = `연도 대비 <span class="up">+${diff.toFixed(1)}%p 앞서는 중</span> 👏`;
+    cmp.innerHTML = `연도 대비 <span class="up">+${diff.toFixed(1)}%p 앞서는 중 (약 ${diffCount}회 여유)</span> 👏`;
   } else {
-    cmp.innerHTML = `연도 대비 <span class="down">${diff.toFixed(1)}%p 뒤처지는 중</span> — 더 뛰자 🔥`;
+    cmp.innerHTML = `연도 대비 <span class="down">${diff.toFixed(1)}%p 뒤처지는 중 (약 ${diffCount}회 부족)</span> — 더 뛰자 🔥`;
   }
 });
 
