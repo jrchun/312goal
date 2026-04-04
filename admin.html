@@ -474,7 +474,7 @@ async function showMain() {
       return;
     }
     const data = await res.json();
-    const content = atob(data.content.replace(/\n/g, ''));
+    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
     const members = parseMembers(content);
     if (!members) { setStatus('MEMBERS 파싱 실패', 'err'); return; }
 
@@ -536,7 +536,7 @@ async function save() {
     }
     const fileData = await getRes.json();
     const sha = fileData.sha;
-    const original = atob(fileData.content.replace(/\n/g, ''));
+    const original = decodeURIComponent(escape(atob(fileData.content.replace(/\n/g, ''))));
 
     // 2. MEMBERS 블록 교체
     const newBlock = `const MEMBERS = {
