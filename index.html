@@ -201,26 +201,15 @@
   .soon .em { font-size: 36px; margin-bottom: 8px; }
   .soon p { font-size: 13px; }
 
-  .admin-btn {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    font-size: 11px;
-    color: var(--muted);
+  .admin-emoji {
     text-decoration: none;
-    background: transparent;
-    padding: 4px 8px;
-    border: 1px solid var(--bar-bg);
-    border-radius: 6px;
-    font-family: 'Noto Sans KR', sans-serif;
-    opacity: 0.6;
   }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1>150 Challenge 🏋️</h1>
+  <h1>150 Challenge <a href="admin.html" class="admin-emoji">🏋️</a></h1>
   <span class="date-tag" id="dateTag"></span>
 </div>
 
@@ -358,6 +347,6 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 </script>
 
-<a href="admin.html" class="admin-btn">관리자</a>
+
 </body>
 </html>
