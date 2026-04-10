@@ -370,6 +370,23 @@
     </div>
   </div>
 
+  <!-- 혁 -->
+  <div class="card">
+    <div class="card-label">member 04</div>
+    <div class="member-name">혁</div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>현재 페이지</label>
+        <input type="number" id="hyuk-current" min="0">
+      </div>
+      <div class="slash">/</div>
+      <div class="field-group">
+        <label>목표 페이지</label>
+        <input type="number" id="hyuk-total" min="1">
+      </div>
+    </div>
+  </div>
+
   <div class="save-area">
     <button class="btn" id="saveBtn" onclick="save()">저장하기</button>
     <div class="status-msg" id="statusMsg"></div>
@@ -499,9 +516,9 @@ function parseMembers(html) {
     const r = block.match(new RegExp(key + '\\s*:\\s*\\{\\s*current\\s*:\\s*(\\d+)[^}]*total\\s*:\\s*(\\d+)'));
     return r ? { current: parseInt(r[1]), total: parseInt(r[2]) } : null;
   };
-  const chun = parse('chun'), ho = parse('ho'), go = parse('go');
-  if (!chun || !ho || !go) return null;
-  return { chun, ho, go };
+  const chun = parse('chun'), ho = parse('ho'), go = parse('go'), hyuk = parse('hyuk');
+  if (!chun || !ho || !go || !hyuk) return null;
+  return { chun, ho, go, hyuk };
 }
 
 /* ─── 저장 ─── */
@@ -512,7 +529,8 @@ async function save() {
   const vals = {
     chun: { current: parseInt(document.getElementById('chun-current').value), total: parseInt(document.getElementById('chun-total').value) },
     ho:   { current: parseInt(document.getElementById('ho-current').value),   total: parseInt(document.getElementById('ho-total').value) },
-    go:   { current: parseInt(document.getElementById('go-current').value),   total: parseInt(document.getElementById('go-total').value) }
+    go:   { current: parseInt(document.getElementById('go-current').value),   total: parseInt(document.getElementById('go-total').value) },
+    hyuk: { current: parseInt(document.getElementById('hyuk-current').value), total: parseInt(document.getElementById('hyuk-total').value) }
   };
 
   for (const [k, v] of Object.entries(vals)) {
@@ -542,7 +560,8 @@ async function save() {
     const newBlock = `const MEMBERS = {
   chun: { current: ${vals.chun.current}, total: ${vals.chun.total} },
   ho:   { current: ${vals.ho.current}, total: ${vals.ho.total} },
-  go:   { current: ${vals.go.current},  total: ${vals.go.total} }
+  go:   { current: ${vals.go.current},  total: ${vals.go.total} },
+  hyuk: { current: ${vals.hyuk.current},  total: ${vals.hyuk.total} }
 };`;
     const updated = original.replace(/const MEMBERS\s*=\s*\{[\s\S]*?\};/, newBlock);
     if (updated === original) {
@@ -552,7 +571,7 @@ async function save() {
 
     // 3. GitHub API로 업데이트
     const encoded = btoa(unescape(encodeURIComponent(updated)));
-    const msg = `Update progress: 천 ${vals.chun.current}/${vals.chun.total}, 호 ${vals.ho.current}/${vals.ho.total}, 고 ${vals.go.current}/${vals.go.total}`;
+    const msg = `Update progress: 천 ${vals.chun.current}/${vals.chun.total}, 호 ${vals.ho.current}/${vals.ho.total}, 고 ${vals.go.current}/${vals.go.total}, 혁 ${vals.hyuk.current}/${vals.hyuk.total}`;
     const putRes = await fetch(API, {
       method: 'PUT',
       headers: {
