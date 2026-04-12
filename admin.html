@@ -501,6 +501,8 @@ async function showMain() {
     document.getElementById('ho-total').value     = members.ho.total;
     document.getElementById('go-current').value   = members.go.current;
     document.getElementById('go-total').value     = members.go.total;
+    document.getElementById('hyuk-current').value = members.hyuk.current;
+    document.getElementById('hyuk-total').value   = members.hyuk.total;
     setStatus('현재 값을 불러왔습니다', 'ok');
   } catch(e) {
     setStatus('네트워크 오류: ' + e.message, 'err');
