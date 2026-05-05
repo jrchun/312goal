@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  
+
   :root {
     --bg: #f4f0ec;
     --text: #1a1a1a;
@@ -193,13 +193,12 @@
   .compare .up { color: #27ae60; font-weight: 700; }
   .compare .down { color: var(--accent); font-weight: 700; }
 
-  .soon {
+  .loading-msg {
     text-align: center;
-    padding: 60px 0;
+    padding: 40px 20px;
+    font-size: 13px;
     color: var(--muted);
   }
-  .soon .em { font-size: 36px; margin-bottom: 8px; }
-  .soon p { font-size: 13px; }
 
   .admin-emoji {
     text-decoration: none;
@@ -219,151 +218,107 @@
   <span class="pct-num" id="yrPct"></span>
 </div>
 
-<div class="tabs" id="tabsWrap">
-  <div class="tab active" data-t="chun">천</div>
-  <div class="tab" data-t="ho">호</div>
-  <div class="tab" data-t="go">고</div>
-  <div class="tab" data-t="hyuk">혁</div>
-</div>
+<div class="tabs" id="tabsWrap"></div>
+<div id="panelsWrap"></div>
+<div class="loading-msg" id="loadingMsg">불러오는 중...</div>
 
-<!-- 천: 돼지→몸짱 30/150 -->
-<div class="panel active" id="p-chun">
-  <div class="img-stage">
-    <img class="img-before" src="./image/fat.jpg" alt="before">
-    <div class="img-after-wrap" id="aw-chun">
-      <img class="img-after" src="./image/goal.jpg" alt="goal">
-    </div>
-    <div class="fill-line" id="fl-chun"><span class="fill-tag" id="ft-chun"></span></div>
-  </div>
-  <div class="counter">
-    <div class="counter-big"><span class="cur" id="c-chun"></span><span class="sep">/</span><span class="tot">150</span></div>
-    <div class="counter-sub">workouts completed</div>
-  </div>
-  <div class="wk-bar">
-    <span class="label">진척률</span>
-    <div class="track"><div class="fill wk" id="wf-chun"></div></div>
-    <span class="wk-pct" id="wp-chun"></span>
-  </div>
-  <div class="compare" id="cmp-chun"></div>
-</div>
-
-<!-- 호: 멸치→몸짱 22/150 -->
-<div class="panel" id="p-ho">
-  <div class="img-stage">
-    <img class="img-before" src="./image/thin1.jpg" alt="before">
-    <div class="img-after-wrap" id="aw-ho">
-      <img class="img-after" src="./image/goal.jpg" alt="goal">
-    </div>
-    <div class="fill-line" id="fl-ho"><span class="fill-tag" id="ft-ho"></span></div>
-  </div>
-  <div class="counter">
-    <div class="counter-big"><span class="cur" id="c-ho"></span><span class="sep">/</span><span class="tot">150</span></div>
-    <div class="counter-sub">workouts completed</div>
-  </div>
-  <div class="wk-bar">
-    <span class="label">진척률</span>
-    <div class="track"><div class="fill wk" id="wf-ho"></div></div>
-    <span class="wk-pct" id="wp-ho"></span>
-  </div>
-  <div class="compare" id="cmp-ho"></div>
-</div>
-
-<!-- 고: 멸치→몸짱 10/150 -->
-<div class="panel" id="p-go">
-  <div class="img-stage">
-    <img class="img-before" src="./image/fat.jpg" alt="before">
-    <div class="img-after-wrap" id="aw-go">
-      <img class="img-after" src="./image/goal.jpg" alt="goal">
-    </div>
-    <div class="fill-line" id="fl-go"><span class="fill-tag" id="ft-go"></span></div>
-  </div>
-  <div class="counter">
-    <div class="counter-big"><span class="cur" id="c-go"></span><span class="sep">/</span><span class="tot">150</span></div>
-    <div class="counter-sub">workouts completed</div>
-  </div>
-  <div class="wk-bar">
-    <span class="label">진척률</span>
-    <div class="track"><div class="fill wk" id="wf-go"></div></div>
-    <span class="wk-pct" id="wp-go"></span>
-  </div>
-  <div class="compare" id="cmp-go"></div>
-</div>
-
-<!-- 혁: 멸치→몸짱 1/120 -->
-<div class="panel" id="p-hyuk">
-  <div class="img-stage">
-    <img class="img-before" src="./image/thin2.jpg" alt="before">
-    <div class="img-after-wrap" id="aw-hyuk">
-      <img class="img-after" src="./image/goal.jpg" alt="goal">
-    </div>
-    <div class="fill-line" id="fl-hyuk"><span class="fill-tag" id="ft-hyuk"></span></div>
-  </div>
-  <div class="counter">
-    <div class="counter-big"><span class="cur" id="c-hyuk"></span><span class="sep">/</span><span class="tot">120</span></div>
-    <div class="counter-sub">workouts completed</div>
-  </div>
-  <div class="wk-bar">
-    <span class="label">진척률</span>
-    <div class="track"><div class="fill wk" id="wf-hyuk"></div></div>
-    <span class="wk-pct" id="wp-hyuk"></span>
-  </div>
-  <div class="compare" id="cmp-hyuk"></div>
-</div>
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const MEMBERS = {
-  chun: { current: 54, total: 150 },
-  ho:   { current: 37, total: 150 },
-  go:   { current: 19,  total: 150 },
-  hyuk: { current: 8,  total: 120 }
-};
+const SUPABASE_URL = 'https://zvrwumrucxyenfngpyhv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2cnd1bXJ1Y3h5ZW5mbmdweWh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODA1ODYsImV4cCI6MjA5MzU1NjU4Nn0.HLwY651fIfJkJECt_IPPhJEM_mzYBdM-NEv_ImsNwvo';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Date
+// Date / year bar
 const now = new Date();
 const ys = new Date(2026,0,1), ye = new Date(2026,11,31,23,59,59);
 const yrPct = Math.min(100, Math.max(0, ((now-ys)/(ye-ys))*100));
-document.getElementById('dateTag').textContent = 
+document.getElementById('dateTag').textContent =
   `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
 document.getElementById('yrFill').style.width = yrPct.toFixed(1)+'%';
 document.getElementById('yrPct').textContent = yrPct.toFixed(1)+'%';
 
-// Render each member
-Object.keys(MEMBERS).forEach(id => {
-  const d = MEMBERS[id];
-  const pct = (d.current / d.total) * 100;
-  const clipTop = 100 - pct;
+async function init() {
+  const { data, error } = await sb.from('member').select('*').order('id');
+  if (error || !data || data.length === 0) {
+    document.getElementById('loadingMsg').textContent = '데이터를 불러오지 못했습니다.';
+    return;
+  }
 
-  document.getElementById(`c-${id}`).textContent = d.current;
-  document.getElementById(`wp-${id}`).textContent = pct.toFixed(1) + '%';
+  document.getElementById('loadingMsg').style.display = 'none';
 
+  const tabsWrap = document.getElementById('tabsWrap');
+  const panelsWrap = document.getElementById('panelsWrap');
+
+  data.forEach((row, idx) => {
+    const key = row.id;
+    const pct = (row.current / row.total) * 100;
+    const diff = pct - yrPct;
+    const diffCount = Math.round(Math.abs(diff) / 100 * row.total);
+    const cmpHTML = diff >= 0
+      ? `연도 대비 <span class="up">+${diff.toFixed(1)}%p 앞서는 중 (약 ${diffCount}회 여유)</span> 👏`
+      : `연도 대비 <span class="down">${diff.toFixed(1)}%p 뒤처지는 중 (약 ${diffCount}회 부족)</span> — 더 뛰자 🔥`;
+
+    // Tab
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (idx === 0 ? ' active' : '');
+    tab.dataset.t = key;
+    tab.textContent = row.name;
+    tabsWrap.appendChild(tab);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'panel' + (idx === 0 ? ' active' : '');
+    panel.id = `p-${key}`;
+    panel.innerHTML = `
+      <div class="img-stage">
+        <img class="img-before" src="${row.before_img}" alt="before">
+        <div class="img-after-wrap" id="aw-${key}">
+          <img class="img-after" src="${row.goal_img}" alt="goal">
+        </div>
+        <div class="fill-line" id="fl-${key}"><span class="fill-tag" id="ft-${key}"></span></div>
+      </div>
+      <div class="counter">
+        <div class="counter-big">
+          <span class="cur" id="c-${key}">${row.current}</span><span class="sep">/</span><span class="tot">${row.total}</span>
+        </div>
+        <div class="counter-sub">workouts completed</div>
+      </div>
+      <div class="wk-bar">
+        <span class="label">진척률</span>
+        <div class="track"><div class="fill wk" id="wf-${key}"></div></div>
+        <span class="wk-pct" id="wp-${key}">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="compare">${cmpHTML}</div>
+    `;
+    panelsWrap.appendChild(panel);
+  });
+
+  // Animations (after DOM renders)
   setTimeout(() => {
-    document.getElementById(`aw-${id}`).style.clipPath = `inset(${clipTop.toFixed(1)}% 0 0 0)`;
-    document.getElementById(`fl-${id}`).style.bottom = pct.toFixed(1) + '%';
-    document.getElementById(`ft-${id}`).textContent = pct.toFixed(1) + '%';
-    document.getElementById(`wf-${id}`).style.width = pct.toFixed(1) + '%';
+    data.forEach(row => {
+      const key = row.id;
+      const pct = (row.current / row.total) * 100;
+      document.getElementById(`aw-${key}`).style.clipPath = `inset(${(100-pct).toFixed(1)}% 0 0 0)`;
+      document.getElementById(`fl-${key}`).style.bottom = pct.toFixed(1) + '%';
+      document.getElementById(`ft-${key}`).textContent = pct.toFixed(1) + '%';
+      document.getElementById(`wf-${key}`).style.width = pct.toFixed(1) + '%';
+    });
   }, 400);
 
-  const diff = pct - yrPct;
-  const cmp = document.getElementById(`cmp-${id}`);
-  const diffCount = Math.round(Math.abs(diff) / 100 * d.total);
-  if (diff >= 0) {
-    cmp.innerHTML = `연도 대비 <span class="up">+${diff.toFixed(1)}%p 앞서는 중 (약 ${diffCount}회 여유)</span> 👏`;
-  } else {
-    cmp.innerHTML = `연도 대비 <span class="down">${diff.toFixed(1)}%p 뒤처지는 중 (약 ${diffCount}회 부족)</span> — 더 뛰자 🔥`;
-  }
-});
-
-// Tab switch
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
+  // Tab switch
+  tabsWrap.addEventListener('click', e => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('p-' + tab.dataset.t).classList.add('active');
   });
-});
-</script>
+}
 
+init();
+</script>
 
 </body>
 </html>

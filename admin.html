@@ -82,9 +82,7 @@
     transition: border-color 0.2s;
     -webkit-text-security: disc;
   }
-  .pin-input input:focus {
-    border-color: var(--accent);
-  }
+  .pin-input input:focus { border-color: var(--accent); }
   .pin-input input.error {
     border-color: #e04a2f;
     animation: shake 0.3s;
@@ -103,31 +101,6 @@
     margin-bottom: 8px;
   }
 
-  /* Token modal extra */
-  .token-input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 2px solid var(--bar-bg);
-    border-radius: 12px;
-    font-size: 13px;
-    font-family: 'Noto Sans KR', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    outline: none;
-    margin-bottom: 16px;
-    transition: border-color 0.2s;
-  }
-  .token-input:focus { border-color: var(--accent); }
-
-  .token-hint {
-    font-size: 11px;
-    color: var(--muted);
-    text-align: left;
-    line-height: 1.6;
-    margin-bottom: 20px;
-  }
-  .token-hint a { color: var(--accent); }
-
   /* ─── Buttons ─── */
   .btn {
     display: block;
@@ -145,11 +118,6 @@
   }
   .btn:hover { opacity: 0.88; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn.secondary {
-    background: var(--bar-bg);
-    color: var(--text);
-    margin-top: 10px;
-  }
 
   /* ─── Main content ─── */
   .header {
@@ -210,7 +178,7 @@
     margin-bottom: 5px;
     font-weight: 400;
   }
-  .field-group input {
+  .field-group input[type="number"] {
     width: 100%;
     padding: 12px 14px;
     border: 2px solid var(--bar-bg);
@@ -224,7 +192,7 @@
     text-align: center;
     transition: border-color 0.2s;
   }
-  .field-group input:focus { border-color: var(--accent); }
+  .field-group input[type="number"]:focus { border-color: var(--accent); }
 
   .slash {
     font-size: 24px;
@@ -233,7 +201,38 @@
     font-family: 'Outfit', sans-serif;
   }
 
-  /* Save section */
+  /* ─── Image upload ─── */
+  .img-upload-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .img-upload-group {
+    flex: 1;
+  }
+  .img-upload-group > span {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .upload-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 6px;
+    background: var(--bg);
+    border: 2px dashed var(--bar-bg);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .img-upload-group input[type="file"] { display: none; }
+
+  /* ─── Save section ─── */
   .save-area {
     margin: 8px 16px 0;
   }
@@ -251,25 +250,6 @@
   }
   .status-msg.ok { color: #2a9d5c; }
   .status-msg.err { color: var(--accent); }
-
-  .token-bar {
-    margin: 0 16px 4px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .token-bar span {
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .token-bar button {
-    font-size: 11px;
-    color: var(--accent);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-  }
 </style>
 </head>
 <body>
@@ -290,33 +270,11 @@
   </div>
 </div>
 
-<!-- ─── GitHub Token Modal ─── -->
-<div class="overlay hidden" id="tokenOverlay">
-  <div class="modal">
-    <div class="lock-icon">🔑</div>
-    <h2>GitHub 토큰 입력</h2>
-    <p>저장 시 GitHub API를 통해 index.html을 업데이트합니다</p>
-    <input type="password" class="token-input" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx">
-    <div class="token-hint">
-      Fine-grained token (권장): Settings → Developer settings →<br>
-      Personal access tokens → Fine-grained →<br>
-      Repository: <strong>312goal</strong> / Permissions: <strong>Contents: Read & write</strong>
-    </div>
-    <div class="err-msg" id="tokenErr"></div>
-    <button class="btn" id="tokenConfirmBtn">확인</button>
-  </div>
-</div>
-
 <!-- ─── Main ─── -->
 <div id="mainContent" style="display:none">
   <div class="header">
     <h1>⚙️ 진척도 관리</h1>
     <span class="badge">admin</span>
-  </div>
-
-  <div class="token-bar">
-    <span id="tokenStatus">토큰: 저장됨 ✓</span>
-    <button onclick="resetToken()">토큰 변경</button>
   </div>
 
   <!-- 천 -->
@@ -325,13 +283,25 @@
     <div class="member-name">천</div>
     <div class="field-row">
       <div class="field-group">
-        <label>현재 페이지</label>
+        <label>현재 횟수</label>
         <input type="number" id="chun-current" min="0">
       </div>
       <div class="slash">/</div>
       <div class="field-group">
-        <label>목표 페이지</label>
+        <label>목표 횟수</label>
         <input type="number" id="chun-total" min="1">
+      </div>
+    </div>
+    <div class="img-upload-row">
+      <div class="img-upload-group">
+        <span>Before 사진</span>
+        <label class="upload-btn" for="img-chun-before">📷 파일 선택</label>
+        <input type="file" id="img-chun-before" accept="image/*" onchange="uploadImg(this, 1, 'before')">
+      </div>
+      <div class="img-upload-group">
+        <span>Goal 사진</span>
+        <label class="upload-btn" for="img-chun-goal">📷 파일 선택</label>
+        <input type="file" id="img-chun-goal" accept="image/*" onchange="uploadImg(this, 1, 'goal')">
       </div>
     </div>
   </div>
@@ -342,13 +312,25 @@
     <div class="member-name">호</div>
     <div class="field-row">
       <div class="field-group">
-        <label>현재 페이지</label>
+        <label>현재 횟수</label>
         <input type="number" id="ho-current" min="0">
       </div>
       <div class="slash">/</div>
       <div class="field-group">
-        <label>목표 페이지</label>
+        <label>목표 횟수</label>
         <input type="number" id="ho-total" min="1">
+      </div>
+    </div>
+    <div class="img-upload-row">
+      <div class="img-upload-group">
+        <span>Before 사진</span>
+        <label class="upload-btn" for="img-ho-before">📷 파일 선택</label>
+        <input type="file" id="img-ho-before" accept="image/*" onchange="uploadImg(this, 2, 'before')">
+      </div>
+      <div class="img-upload-group">
+        <span>Goal 사진</span>
+        <label class="upload-btn" for="img-ho-goal">📷 파일 선택</label>
+        <input type="file" id="img-ho-goal" accept="image/*" onchange="uploadImg(this, 2, 'goal')">
       </div>
     </div>
   </div>
@@ -359,13 +341,25 @@
     <div class="member-name">고</div>
     <div class="field-row">
       <div class="field-group">
-        <label>현재 페이지</label>
+        <label>현재 횟수</label>
         <input type="number" id="go-current" min="0">
       </div>
       <div class="slash">/</div>
       <div class="field-group">
-        <label>목표 페이지</label>
+        <label>목표 횟수</label>
         <input type="number" id="go-total" min="1">
+      </div>
+    </div>
+    <div class="img-upload-row">
+      <div class="img-upload-group">
+        <span>Before 사진</span>
+        <label class="upload-btn" for="img-go-before">📷 파일 선택</label>
+        <input type="file" id="img-go-before" accept="image/*" onchange="uploadImg(this, 3, 'before')">
+      </div>
+      <div class="img-upload-group">
+        <span>Goal 사진</span>
+        <label class="upload-btn" for="img-go-goal">📷 파일 선택</label>
+        <input type="file" id="img-go-goal" accept="image/*" onchange="uploadImg(this, 3, 'goal')">
       </div>
     </div>
   </div>
@@ -376,13 +370,25 @@
     <div class="member-name">혁</div>
     <div class="field-row">
       <div class="field-group">
-        <label>현재 페이지</label>
+        <label>현재 횟수</label>
         <input type="number" id="hyuk-current" min="0">
       </div>
       <div class="slash">/</div>
       <div class="field-group">
-        <label>목표 페이지</label>
+        <label>목표 횟수</label>
         <input type="number" id="hyuk-total" min="1">
+      </div>
+    </div>
+    <div class="img-upload-row">
+      <div class="img-upload-group">
+        <span>Before 사진</span>
+        <label class="upload-btn" for="img-hyuk-before">📷 파일 선택</label>
+        <input type="file" id="img-hyuk-before" accept="image/*" onchange="uploadImg(this, 4, 'before')">
+      </div>
+      <div class="img-upload-group">
+        <span>Goal 사진</span>
+        <label class="upload-btn" for="img-hyuk-goal">📷 파일 선택</label>
+        <input type="file" id="img-hyuk-goal" accept="image/*" onchange="uploadImg(this, 4, 'goal')">
       </div>
     </div>
   </div>
@@ -393,11 +399,15 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const REPO  = 'jrchun/312goal';
-const FILE  = 'index.html';
-const PW    = '0000';
-const API   = `https://api.github.com/repos/${REPO}/contents/${FILE}`;
+const SUPABASE_URL = 'https://zvrwumrucxyenfngpyhv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2cnd1bXJ1Y3h5ZW5mbmdweWh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODA1ODYsImV4cCI6MjA5MzU1NjU4Nn0.HLwY651fIfJkJECt_IPPhJEM_mzYBdM-NEv_ImsNwvo';
+const PW = '0000';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const KEY_MAP = { 1: 'chun', 2: 'ho', 3: 'go', 4: 'hyuk' };
 
 /* ─── PIN 입력 처리 ─── */
 const pins = document.querySelectorAll('#pinInputs input');
@@ -424,13 +434,20 @@ pins.forEach((inp, i) => {
   });
 });
 
-pins[0].focus();
+// 새로고침 시 재인증 불필요
+if (sessionStorage.getItem('authed')) {
+  document.getElementById('pwOverlay').classList.add('hidden');
+  showMain();
+} else {
+  pins[0].focus();
+}
 
 function checkPin() {
   const entered = [...pins].map(p => p.value).join('');
   if (entered === PW) {
+    sessionStorage.setItem('authed', '1');
     document.getElementById('pwOverlay').classList.add('hidden');
-    onLogin();
+    showMain();
   } else {
     document.getElementById('pwErr').textContent = '잘못된 PIN입니다';
     pins.forEach(p => { p.classList.add('error'); p.value = ''; });
@@ -442,102 +459,45 @@ function checkPin() {
   }
 }
 
-/* ─── 로그인 후 처리 ─── */
-function onLogin() {
-  const token = sessionStorage.getItem('gh_token');
-  if (!token) {
-    document.getElementById('tokenOverlay').classList.remove('hidden');
-  } else {
-    showMain();
-  }
-}
-
-/* ─── 토큰 확인 ─── */
-document.getElementById('tokenConfirmBtn').addEventListener('click', () => {
-  const val = document.getElementById('tokenInput').value.trim();
-  if (!val) {
-    document.getElementById('tokenErr').textContent = '토큰을 입력해주세요';
-    return;
-  }
-  sessionStorage.setItem('gh_token', val);
-  document.getElementById('tokenOverlay').classList.add('hidden');
-  showMain();
-});
-
-function resetToken() {
-  sessionStorage.removeItem('gh_token');
-  document.getElementById('tokenInput').value = '';
-  document.getElementById('tokenErr').textContent = '';
-  document.getElementById('tokenOverlay').classList.remove('hidden');
-}
-
 /* ─── 메인 화면 표시 + 현재값 로드 ─── */
 async function showMain() {
   document.getElementById('mainContent').style.display = 'block';
-  document.getElementById('tokenStatus').textContent = '토큰: 저장됨 ✓';
   setStatus('현재 값을 불러오는 중...', '');
 
-  const token = sessionStorage.getItem('gh_token');
-  try {
-    const res = await fetch(API, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
-    });
-    if (!res.ok) {
-      if (res.status === 401) {
-        setStatus('토큰이 유효하지 않습니다. 토큰을 다시 입력해주세요.', 'err');
-      } else {
-        setStatus(`불러오기 실패 (${res.status})`, 'err');
-      }
-      return;
-    }
-    const data = await res.json();
-    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
-    const members = parseMembers(content);
-    if (!members) { setStatus('MEMBERS 파싱 실패', 'err'); return; }
-
-    document.getElementById('chun-current').value = members.chun.current;
-    document.getElementById('chun-total').value   = members.chun.total;
-    document.getElementById('ho-current').value   = members.ho.current;
-    document.getElementById('ho-total').value     = members.ho.total;
-    document.getElementById('go-current').value   = members.go.current;
-    document.getElementById('go-total').value     = members.go.total;
-    document.getElementById('hyuk-current').value = members.hyuk.current;
-    document.getElementById('hyuk-total').value   = members.hyuk.total;
-    setStatus('현재 값을 불러왔습니다', 'ok');
-  } catch(e) {
-    setStatus('네트워크 오류: ' + e.message, 'err');
+  const { data, error } = await sb.from('member').select('*').order('id');
+  if (error || !data) {
+    setStatus('불러오기 실패: ' + (error?.message || '알 수 없는 오류'), 'err');
+    return;
   }
-}
 
-/* ─── MEMBERS 객체 파싱 ─── */
-function parseMembers(html) {
-  const m = html.match(/const MEMBERS\s*=\s*\{([\s\S]*?)\};/);
-  if (!m) return null;
-  const block = m[1];
-  const parse = (key) => {
-    const r = block.match(new RegExp(key + '\\s*:\\s*\\{\\s*current\\s*:\\s*(\\d+)[^}]*total\\s*:\\s*(\\d+)'));
-    return r ? { current: parseInt(r[1]), total: parseInt(r[2]) } : null;
-  };
-  const chun = parse('chun'), ho = parse('ho'), go = parse('go'), hyuk = parse('hyuk');
-  if (!chun || !ho || !go || !hyuk) return null;
-  return { chun, ho, go, hyuk };
+  data.forEach(row => {
+    const key = KEY_MAP[row.id];
+    if (!key) return;
+    document.getElementById(`${key}-current`).value = row.current;
+    document.getElementById(`${key}-total`).value = row.total;
+  });
+
+  setStatus('현재 값을 불러왔습니다', 'ok');
 }
 
 /* ─── 저장 ─── */
 async function save() {
-  const token = sessionStorage.getItem('gh_token');
-  if (!token) { setStatus('토큰이 없습니다. 토큰을 다시 입력해주세요.', 'err'); return; }
+  const members = [
+    { id: 1, key: 'chun' },
+    { id: 2, key: 'ho' },
+    { id: 3, key: 'go' },
+    { id: 4, key: 'hyuk' }
+  ];
 
-  const vals = {
-    chun: { current: parseInt(document.getElementById('chun-current').value), total: parseInt(document.getElementById('chun-total').value) },
-    ho:   { current: parseInt(document.getElementById('ho-current').value),   total: parseInt(document.getElementById('ho-total').value) },
-    go:   { current: parseInt(document.getElementById('go-current').value),   total: parseInt(document.getElementById('go-total').value) },
-    hyuk: { current: parseInt(document.getElementById('hyuk-current').value), total: parseInt(document.getElementById('hyuk-total').value) }
-  };
+  const vals = members.map(m => ({
+    id: m.id,
+    current: parseInt(document.getElementById(`${m.key}-current`).value),
+    total: parseInt(document.getElementById(`${m.key}-total`).value)
+  }));
 
-  for (const [k, v] of Object.entries(vals)) {
+  for (const v of vals) {
     if (isNaN(v.current) || isNaN(v.total) || v.total < 1) {
-      setStatus(`${k}의 값이 올바르지 않습니다`, 'err'); return;
+      setStatus('입력값이 올바르지 않습니다', 'err'); return;
     }
   }
 
@@ -546,54 +506,51 @@ async function save() {
   setStatus('저장 중...', '');
 
   try {
-    // 1. 현재 파일 가져오기 (sha 필요)
-    const getRes = await fetch(API, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
-    });
-    if (!getRes.ok) {
-      setStatus(`파일 읽기 실패 (${getRes.status})`, 'err');
-      btn.disabled = false; return;
-    }
-    const fileData = await getRes.json();
-    const sha = fileData.sha;
-    const original = decodeURIComponent(escape(atob(fileData.content.replace(/\n/g, ''))));
-
-    // 2. MEMBERS 블록 교체
-    const newBlock = `const MEMBERS = {
-  chun: { current: ${vals.chun.current}, total: ${vals.chun.total} },
-  ho:   { current: ${vals.ho.current}, total: ${vals.ho.total} },
-  go:   { current: ${vals.go.current},  total: ${vals.go.total} },
-  hyuk: { current: ${vals.hyuk.current},  total: ${vals.hyuk.total} }
-};`;
-    const updated = original.replace(/const MEMBERS\s*=\s*\{[\s\S]*?\};/, newBlock);
-    if (updated === original) {
-      setStatus('변경된 내용이 없거나 패턴을 찾지 못했습니다', 'err');
-      btn.disabled = false; return;
-    }
-
-    // 3. GitHub API로 업데이트
-    const encoded = btoa(unescape(encodeURIComponent(updated)));
-    const msg = `Update progress: 천 ${vals.chun.current}/${vals.chun.total}, 호 ${vals.ho.current}/${vals.ho.total}, 고 ${vals.go.current}/${vals.go.total}, 혁 ${vals.hyuk.current}/${vals.hyuk.total}`;
-    const putRes = await fetch(API, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ message: msg, content: encoded, sha })
-    });
-
-    if (putRes.ok) {
-      setStatus('✅ 저장 완료! GitHub에 반영되었습니다', 'ok');
+    const results = await Promise.all(
+      vals.map(v => sb.from('member').update({ current: v.current, total: v.total }).eq('id', v.id))
+    );
+    const failed = results.find(r => r.error);
+    if (failed) {
+      setStatus('저장 실패: ' + failed.error.message, 'err');
     } else {
-      const errData = await putRes.json();
-      setStatus(`저장 실패: ${errData.message || putRes.status}`, 'err');
+      setStatus('✅ 저장 완료!', 'ok');
     }
   } catch(e) {
     setStatus('오류: ' + e.message, 'err');
   }
   btn.disabled = false;
+}
+
+/* ─── 이미지 업로드 ─── */
+async function uploadImg(input, memberId, type) {
+  const file = input.files[0];
+  if (!file) return;
+
+  setStatus('업로드 중...', '');
+
+  const { error: uploadError } = await sb.storage
+    .from('312goal_img')
+    .upload(file.name, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) {
+    setStatus('업로드 실패: ' + uploadError.message, 'err');
+    input.value = '';
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from('312goal_img').getPublicUrl(file.name);
+  const column = type === 'before' ? 'before_img' : 'goal_img';
+
+  const { error: updateError } = await sb.from('member')
+    .update({ [column]: urlData.publicUrl })
+    .eq('id', memberId);
+
+  if (updateError) {
+    setStatus('DB 업데이트 실패: ' + updateError.message, 'err');
+  } else {
+    setStatus('✅ 사진 업로드 완료!', 'ok');
+  }
+  input.value = '';
 }
 
 function setStatus(msg, type) {
