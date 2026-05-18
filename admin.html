@@ -438,7 +438,7 @@ async function uploadImg(input, memberId, type) {
   setStatus('업로드 중...', '');
 
   const { error: uploadError } = await sb.storage
-    .from('312GOAL_IMG')
+    .from('312goal_img')
     .upload(file.name, file, { upsert: true, contentType: file.type });
 
   if (uploadError) {
@@ -447,7 +447,7 @@ async function uploadImg(input, memberId, type) {
     return;
   }
 
-  const { data: urlData } = sb.storage.from('312GOAL_IMG').getPublicUrl(file.name);
+  const { data: urlData } = sb.storage.from('312goal_img').getPublicUrl(file.name);
   const column = type === 'before' ? 'before_img' : 'goal_img';
 
   const { error: updateError } = await sb.from('member')
