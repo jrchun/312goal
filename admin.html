@@ -435,11 +435,16 @@ async function uploadImg(input, memberId, type) {
   const file = input.files[0];
   if (!file) return;
 
+  const ext = file.name.split('.').pop();
+  const fileName = `${memberId}_${type}.${ext}`;
+
   setStatus('업로드 중...', '');
+
+  await sb.storage.from('312goal_img').remove([fileName]);
 
   const { error: uploadError } = await sb.storage
     .from('312goal_img')
-    .upload(file.name, file, { upsert: true, contentType: file.type });
+    .upload(fileName, file, { contentType: file.type });
 
   if (uploadError) {
     setStatus('업로드 실패: ' + uploadError.message, 'err');
@@ -447,7 +452,7 @@ async function uploadImg(input, memberId, type) {
     return;
   }
 
-  const { data: urlData } = sb.storage.from('312goal_img').getPublicUrl(file.name);
+  const { data: urlData } = sb.storage.from('312goal_img').getPublicUrl(fileName);
   const column = type === 'before' ? 'before_img' : 'goal_img';
 
   const { error: updateError } = await sb.from('member')
