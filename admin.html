@@ -441,6 +441,7 @@ async function uploadImg(input, memberId, type) {
   setStatus('업로드 중...', '');
 
   await sb.storage.from('312goal_img').remove([fileName]);
+  await new Promise(resolve => setTimeout(resolve, 200));
 
   const { error: uploadError } = await sb.storage
     .from('312goal_img')
