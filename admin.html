@@ -277,121 +277,7 @@
     <span class="badge">admin</span>
   </div>
 
-  <!-- 천 -->
-  <div class="card">
-    <div class="card-label">member 01</div>
-    <div class="member-name">천</div>
-    <div class="field-row">
-      <div class="field-group">
-        <label>현재 횟수</label>
-        <input type="number" id="chun-current" min="0">
-      </div>
-      <div class="slash">/</div>
-      <div class="field-group">
-        <label>목표 횟수</label>
-        <input type="number" id="chun-total" min="1">
-      </div>
-    </div>
-    <div class="img-upload-row">
-      <div class="img-upload-group">
-        <span>Before 사진</span>
-        <label class="upload-btn" for="img-chun-before">📷 파일 선택</label>
-        <input type="file" id="img-chun-before" accept="image/*" onchange="uploadImg(this, 1, 'before')">
-      </div>
-      <div class="img-upload-group">
-        <span>Goal 사진</span>
-        <label class="upload-btn" for="img-chun-goal">📷 파일 선택</label>
-        <input type="file" id="img-chun-goal" accept="image/*" onchange="uploadImg(this, 1, 'goal')">
-      </div>
-    </div>
-  </div>
-
-  <!-- 호 -->
-  <div class="card">
-    <div class="card-label">member 02</div>
-    <div class="member-name">호</div>
-    <div class="field-row">
-      <div class="field-group">
-        <label>현재 횟수</label>
-        <input type="number" id="ho-current" min="0">
-      </div>
-      <div class="slash">/</div>
-      <div class="field-group">
-        <label>목표 횟수</label>
-        <input type="number" id="ho-total" min="1">
-      </div>
-    </div>
-    <div class="img-upload-row">
-      <div class="img-upload-group">
-        <span>Before 사진</span>
-        <label class="upload-btn" for="img-ho-before">📷 파일 선택</label>
-        <input type="file" id="img-ho-before" accept="image/*" onchange="uploadImg(this, 2, 'before')">
-      </div>
-      <div class="img-upload-group">
-        <span>Goal 사진</span>
-        <label class="upload-btn" for="img-ho-goal">📷 파일 선택</label>
-        <input type="file" id="img-ho-goal" accept="image/*" onchange="uploadImg(this, 2, 'goal')">
-      </div>
-    </div>
-  </div>
-
-  <!-- 고 -->
-  <div class="card">
-    <div class="card-label">member 03</div>
-    <div class="member-name">고</div>
-    <div class="field-row">
-      <div class="field-group">
-        <label>현재 횟수</label>
-        <input type="number" id="go-current" min="0">
-      </div>
-      <div class="slash">/</div>
-      <div class="field-group">
-        <label>목표 횟수</label>
-        <input type="number" id="go-total" min="1">
-      </div>
-    </div>
-    <div class="img-upload-row">
-      <div class="img-upload-group">
-        <span>Before 사진</span>
-        <label class="upload-btn" for="img-go-before">📷 파일 선택</label>
-        <input type="file" id="img-go-before" accept="image/*" onchange="uploadImg(this, 3, 'before')">
-      </div>
-      <div class="img-upload-group">
-        <span>Goal 사진</span>
-        <label class="upload-btn" for="img-go-goal">📷 파일 선택</label>
-        <input type="file" id="img-go-goal" accept="image/*" onchange="uploadImg(this, 3, 'goal')">
-      </div>
-    </div>
-  </div>
-
-  <!-- 혁 -->
-  <div class="card">
-    <div class="card-label">member 04</div>
-    <div class="member-name">혁</div>
-    <div class="field-row">
-      <div class="field-group">
-        <label>현재 횟수</label>
-        <input type="number" id="hyuk-current" min="0">
-      </div>
-      <div class="slash">/</div>
-      <div class="field-group">
-        <label>목표 횟수</label>
-        <input type="number" id="hyuk-total" min="1">
-      </div>
-    </div>
-    <div class="img-upload-row">
-      <div class="img-upload-group">
-        <span>Before 사진</span>
-        <label class="upload-btn" for="img-hyuk-before">📷 파일 선택</label>
-        <input type="file" id="img-hyuk-before" accept="image/*" onchange="uploadImg(this, 4, 'before')">
-      </div>
-      <div class="img-upload-group">
-        <span>Goal 사진</span>
-        <label class="upload-btn" for="img-hyuk-goal">📷 파일 선택</label>
-        <input type="file" id="img-hyuk-goal" accept="image/*" onchange="uploadImg(this, 4, 'goal')">
-      </div>
-    </div>
-  </div>
+  <div id="cardsWrap"></div>
 
   <div class="save-area">
     <button class="btn" id="saveBtn" onclick="save()">저장하기</button>
@@ -407,7 +293,7 @@ const PW = '0000';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const KEY_MAP = { 1: 'chun', 2: 'ho', 3: 'go', 4: 'hyuk' };
+let memberIds = [];
 
 /* ─── PIN 입력 처리 ─── */
 const pins = document.querySelectorAll('#pinInputs input');
@@ -459,7 +345,7 @@ function checkPin() {
   }
 }
 
-/* ─── 메인 화면 표시 + 현재값 로드 ─── */
+/* ─── 메인 화면 표시 + 카드 동적 생성 ─── */
 async function showMain() {
   document.getElementById('mainContent').style.display = 'block';
   setStatus('현재 값을 불러오는 중...', '');
@@ -470,11 +356,41 @@ async function showMain() {
     return;
   }
 
-  data.forEach(row => {
-    const key = KEY_MAP[row.id];
-    if (!key) return;
-    document.getElementById(`${key}-current`).value = row.current;
-    document.getElementById(`${key}-total`).value = row.total;
+  memberIds = data.map(r => r.id);
+  const cardsWrap = document.getElementById('cardsWrap');
+  cardsWrap.innerHTML = '';
+
+  data.forEach((row, idx) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-label">member ${String(idx + 1).padStart(2, '0')}</div>
+      <div class="member-name">${row.name}</div>
+      <div class="field-row">
+        <div class="field-group">
+          <label>현재 횟수</label>
+          <input type="number" id="cur-${row.id}" min="0" value="${row.current}">
+        </div>
+        <div class="slash">/</div>
+        <div class="field-group">
+          <label>목표 횟수</label>
+          <input type="number" id="tot-${row.id}" min="1" value="${row.total}">
+        </div>
+      </div>
+      <div class="img-upload-row">
+        <div class="img-upload-group">
+          <span>Before 사진</span>
+          <label class="upload-btn" for="img-${row.id}-before">📷 파일 선택</label>
+          <input type="file" id="img-${row.id}-before" accept="image/*" onchange="uploadImg(this, ${row.id}, 'before')">
+        </div>
+        <div class="img-upload-group">
+          <span>Goal 사진</span>
+          <label class="upload-btn" for="img-${row.id}-goal">📷 파일 선택</label>
+          <input type="file" id="img-${row.id}-goal" accept="image/*" onchange="uploadImg(this, ${row.id}, 'goal')">
+        </div>
+      </div>
+    `;
+    cardsWrap.appendChild(card);
   });
 
   setStatus('현재 값을 불러왔습니다', 'ok');
@@ -482,17 +398,10 @@ async function showMain() {
 
 /* ─── 저장 ─── */
 async function save() {
-  const members = [
-    { id: 1, key: 'chun' },
-    { id: 2, key: 'ho' },
-    { id: 3, key: 'go' },
-    { id: 4, key: 'hyuk' }
-  ];
-
-  const vals = members.map(m => ({
-    id: m.id,
-    current: parseInt(document.getElementById(`${m.key}-current`).value),
-    total: parseInt(document.getElementById(`${m.key}-total`).value)
+  const vals = memberIds.map(id => ({
+    id,
+    current: parseInt(document.getElementById(`cur-${id}`).value),
+    total: parseInt(document.getElementById(`tot-${id}`).value)
   }));
 
   for (const v of vals) {
