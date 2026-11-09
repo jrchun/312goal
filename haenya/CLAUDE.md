@@ -108,7 +108,11 @@
 
 ## DB (Supabase)
 
-- 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(SQL Editor에 통째로 붙여넣기, 재실행 안전).
+- 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).
+- **DB 반영은 Claude가 직접 한다**: `bash scripts/db-apply.sh`(schema.sql 전체 적용), `bash scripts/db-apply.sh "select ..."`(확인용 SQL).
+  Supabase 관리 API(api.supabase.com)를 쓰고, 토큰은 Claude 작업 환경("312goal")에 저장돼 프록시가 자동으로 붙인다. 사용자에게 SQL 붙여넣기를 시키지 않는다.
+  적용 전에 `docs/db-test/run.sh`로 로컬 검증부터. 다른 Supabase 프로젝트(기존 312goal)는 건드리지 않는다.
+- 함수가 돌려주는 칸을 바꾸면 `create or replace`가 실패하므로 그 앞에 `drop function if exists`를 둔다.
 - 앱은 테이블에 직접 쓰지 않고 함수를 부른다: `create_group`, `join_group`, `get_invite_preview`(비로그인 가능), `submit_checkin`, `send_nudge`.
 - 화면용 집계: `group_week_board`(이번 주 보드·순위·무소식 일수), `my_stats`, `my_weeks`(52주 칸), `group_week_summary`(주간 결산).
 - 직접 쓰기는 이것만 허용: profiles(본인), groups 이름·목표(그룹장), group_members.season_goal·나가기(본인), checkins 삭제(본인), reactions(본인), push_tokens(본인).
