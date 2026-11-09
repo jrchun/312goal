@@ -13,3 +13,5 @@ create table storage.buckets (id text primary key, name text, public bool, file_
 create table storage.objects (id uuid default gen_random_uuid() primary key, bucket_id text, name text);
 alter table storage.objects enable row level security;
 grant all on storage.objects to authenticated;
+
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;

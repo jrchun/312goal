@@ -24,7 +24,7 @@ async function loadUserData(userId: string) {
     supabase.from('profiles').select('id, nickname, avatar_url, terms_agreed_at').eq('id', userId).maybeSingle(),
     supabase
       .from('group_members')
-      .select('season_goal, role, group:groups(id, name, invite_code, weekly_goal, season_goal, owner_id)')
+      .select('season_goal, role, joined_at, group:groups(id, name, invite_code, weekly_goal, season_goal, owner_id)')
       .eq('user_id', userId)
       .maybeSingle(),
   ]);

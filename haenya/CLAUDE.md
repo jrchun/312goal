@@ -131,6 +131,16 @@ Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시�
 - 인스타: Web Share API로 파일 공유(`src/lib/share.web.ts`), 안 되면(카톡 인앱 등) `SaveImageSheet`로 이미지를 띄우고 "길게 눌러 저장" 안내.
 - 이름 부르기는 받침에 따라 `callName()`(민지야/고은아), 순서는 `ordinalWord()`(첫/두/세 번째) — `src/lib/korean.ts`.
 
+## 그룹·마이·설정 (STAGE 6)
+
+- 그룹 탭: `group_week_board`(순위 = rank) + 이번 주 checkins + 서명 URL(`src/lib/photos.ts`, 1시간) + reactions(본인만 넣고 뺌). 사진 누르면 `PhotoViewer`.
+- 마이 탭: `my_stats`, `my_weeks`(52칸, 가입 전 주는 흐리게), 내 사진 → 눌러서 지우기(`deleteCheckin`).
+- 설정: 닉네임·내 올해 목표·(그룹장) 그룹 설정·초대 링크·로그아웃·그룹 나가기·회원 탈퇴. 위험한 동작은 두 번 눌러야 실행.
+- 삭제 순서: **사진 파일 먼저(Storage API) → DB 함수**(`src/lib/account.ts`). Supabase는 SQL로 storage.objects를 못 지우게 막는다(protect_objects_delete).
+- DB: `leave_group`, `delete_my_account`(사용자용) / `release_membership`, `delete_user_account`, `kakao_unlink_target`(내부·서버 전용, authenticated 실행 권한 회수). 그룹장이 나가면 다음 멤버에게, 마지막이면 그룹 삭제.
+- **주의:** Supabase는 새 함수에 authenticated 실행 권한을 자동으로 준다 → 내부용 함수는 schema.sql 끝의 revoke 목록에 꼭 추가.
+- 카카오 연결 해제 웹훅: `functions/api/kakao-unlink.ts`. Cloudflare Secret `KAKAO_ADMIN_KEY`, `SUPABASE_SERVICE_ROLE_KEY` + 카카오 콘솔 웹훅 URL `https://haenya.pages.dev/api/kakao-unlink` 이 있어야 동작(없으면 503).
+
 ## DB (Supabase)
 
 - 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).

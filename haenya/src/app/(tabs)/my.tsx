@@ -1,14 +1,178 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
-import { Placeholder } from '../../components/Placeholder';
+import { Label } from '../../components/Form';
+import { PhotoGrid } from '../../components/PhotoGrid';
+import { PhotoViewer, ViewerPhoto } from '../../components/PhotoViewer';
+import { Rule } from '../../components/Rule';
+import { Screen } from '../../components/Screen';
+import { deleteCheckin } from '../../lib/account';
+import { checkDate, weekStart } from '../../lib/dates';
+import { signedUrls } from '../../lib/photos';
 import { useSession } from '../../lib/session';
+import { supabase } from '../../lib/supabase';
+import type { CheckinRow, MyStats, MyWeek } from '../../lib/types';
+import { color, font, line, space, type } from '../../theme';
 
+/** 마이 — 시즌 누적을 가장 크게, 연말 예측으로 압박. 52주 칸, 찌른·찔린 횟수, 내 인증샷 */
 export default function My() {
-  const { signOut } = useSession();
+  const { membership, profile, session } = useSession();
+  const group = membership?.group;
+  const [stats, setStats] = useState<MyStats | null>(null);
+  const [weeks, setWeeks] = useState<MyWeek[]>([]);
+  const [photos, setPhotos] = useState<CheckinRow[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!group || !session) return;
+    const [s, w, c] = await Promise.all([
+      supabase.rpc('my_stats', { p_group_id: group.id }).maybeSingle(),
+      supabase.rpc('my_weeks', { p_group_id: group.id }),
+      supabase
+        .from('checkins')
+        .select('id, user_id, check_date, photo_path, date_verified, counted, created_at')
+        .eq('group_id', group.id)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(40),
+    ]);
+    setStats((s.data as MyStats | null) ?? null);
+    setWeeks((w.data as MyWeek[]) ?? []);
+    const rows = (c.data as CheckinRow[]) ?? [];
+    setPhotos(rows);
+    setUrls(await signedUrls(rows.map((r) => r.photo_path)));
+  }, [group, session]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  // 52칸: 올해 주 + 남은 주(빈칸). 가입 전 주는 흐리게
+  const cells = useMemo(() => {
+    const joinedWeek = membership ? weekStart(checkDate(new Date(membership.joined_at))) : '';
+    const out: { key: string; state: 'done' | 'miss' | 'current' | 'before' | 'future' }[] = weeks.map((w) => ({
+      key: w.week,
+      state: w.is_current ? 'current' : w.week < joinedWeek ? 'before' : w.achieved ? 'done' : 'miss',
+    }));
+    while (out.length < 52) out.push({ key: `f${out.length}`, state: 'future' });
+    return out.slice(0, 53);
+  }, [weeks, membership]);
+
+  const goal = stats?.season_goal ?? membership?.season_goal ?? 150;
+  const count = stats?.season_count ?? 0;
+  const projected = stats?.projected ?? 0;
+  const short = goal - projected;
+
+  const viewer: ViewerPhoto | null = useMemo(() => {
+    const p = photos.find((x) => x.id === open);
+    if (!p) return null;
+    const [, m, d] = p.check_date.split('-');
+    return {
+      id: p.id,
+      url: urls[p.photo_path],
+      title: `${Number(m)}월 ${Number(d)}일${p.counted ? '' : ' · 사진만 저장'}`,
+      unverified: !p.date_verified,
+      counts: {},
+      mine: {},
+      canDelete: true,
+    };
+  }, [open, photos, urls]);
+
   return (
-    <Placeholder title="5/150" sentence="시즌 누적, 연말 예측, 52주 기록. (STAGE 6)">
-      <Button variant="secondary" label="설정" onPress={() => router.push('/settings')} />
-      <Button variant="text" label="로그아웃" onPress={async () => { await signOut(); router.replace('/'); }} />
-    </Placeholder>
+    <Screen>
+      <View style={styles.top}>
+        <Text style={[type.caption, { color: color.black }]} numberOfLines={1}>
+          {profile?.nickname} · {group?.name}
+        </Text>
+        <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
+      </View>
+      <Label>{stats?.season_year ?? checkDate().slice(0, 4)} 시즌 누적</Label>
+      <Text style={[type.progress, styles.big]}>
+        {count}
+        <Text style={{ color: color.gray, fontSize: 56 }}>/{goal}</Text>
+      </Text>
+      <Text style={[type.sentence, { color: color.black }]}>
+        이 속도면 연말에 <Text style={{ color: color.textRed }}>{projected}회</Text>.{' '}
+        {short > 0 ? `${short}회 모자람.` : '목표 넘긴다.'}
+      </Text>
+      <View style={styles.gapRule}><Rule /></View>
+
+      <View style={styles.sectionHead}>
+        <Label>52주 기록</Label>
+        <Text style={type.caption}>■ 달성 · □ 미달 · 빨강 이번 주</Text>
+      </View>
+      <View style={styles.weeks}>
+        {cells.map((c) => (
+          <View
+            key={c.key}
+            style={[
+              styles.cell,
+              c.state === 'done' && { backgroundColor: color.black },
+              c.state === 'current' && { borderColor: color.red, backgroundColor: color.highlight },
+              (c.state === 'before' || c.state === 'future') && { borderColor: color.gray },
+            ]}
+          />
+        ))}
+      </View>
+
+      <View style={styles.stats}>
+        <Stat value={`${stats?.streak_weeks ?? 0}주`} label="연속 달성" />
+        <Stat value={`${stats?.nudges_sent ?? 0}번`} label="찌른 횟수" />
+        <Stat value={`${stats?.nudges_received ?? 0}번`} label="찔린 횟수" />
+      </View>
+      <Rule weight="row" />
+
+      <View style={styles.section}>
+        <View style={styles.sectionHead}>
+          <Label>내 인증샷</Label>
+          <Text style={type.caption}>눌러서 크게 보기·지우기</Text>
+        </View>
+        {photos.length ? (
+          <PhotoGrid
+            cols={4}
+            items={photos.map((p) => ({ id: p.id, url: urls[p.photo_path], unverified: !p.date_verified }))}
+            onPress={setOpen}
+          />
+        ) : (
+          <Text style={[type.sentence, { color: color.black }]}>아직 한 장도 없다.</Text>
+        )}
+      </View>
+      <PhotoViewer
+        photo={viewer}
+        onClose={() => setOpen(null)}
+        onDelete={async () => {
+          const p = photos.find((x) => x.id === open);
+          if (!p) return;
+          await deleteCheckin(p);
+          setOpen(null);
+          await load();
+        }}
+      />
+    </Screen>
   );
 }
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={{ ...font.display, fontSize: 32, lineHeight: 38, color: color.black }}>{value}</Text>
+      <Text style={type.caption}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space(2) },
+  big: { color: color.black, paddingTop: space(1) },
+  gapRule: { paddingVertical: space(4) },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: space(2) },
+  weeks: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  cell: { width: `${(100 - (12 * 4 * 100) / 350) / 13}%`, aspectRatio: 1, borderWidth: line.row, borderColor: color.black },
+  stats: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space(5) },
+  stat: { gap: 2 },
+  section: { gap: space(1), paddingTop: space(5), paddingBottom: space(6) },
+});

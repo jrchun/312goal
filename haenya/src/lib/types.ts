@@ -17,6 +17,7 @@ export type Group = {
 
 export type Membership = {
   season_goal: number;
+  joined_at: string;
   role: 'owner' | 'member';
   group: Group;
 };
@@ -48,3 +49,31 @@ export type BoardRow = {
   rank_weeks: number;
   rank: number;
 };
+
+/** 사진 한 장 (checkins 한 줄) */
+export type CheckinRow = {
+  id: string;
+  user_id: string;
+  check_date: string;
+  photo_path: string;
+  date_verified: boolean;
+  counted: boolean;
+  created_at: string;
+};
+
+export type ReactionKey = 'fire' | 'muscle' | 'clap' | 'laugh';
+export type ReactionRow = { checkin_id: string; user_id: string; emoji: ReactionKey };
+
+/** my_stats() */
+export type MyStats = {
+  season_year: number;
+  season_count: number;
+  season_goal: number;
+  projected: number;
+  streak_weeks: number;
+  nudges_sent: number;
+  nudges_received: number;
+};
+
+/** my_weeks() 한 줄 */
+export type MyWeek = { week: string; cnt: number; achieved: boolean; is_current: boolean };

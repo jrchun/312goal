@@ -602,11 +602,107 @@ language sql stable as $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- 9-1. 인증 삭제 · 그룹 나가기 · 회원 탈퇴 (STAGE 6)
+-- ---------------------------------------------------------------------
+-- 사진 파일은 SQL로 못 지운다(storage 보호 트리거) → 앱이 Storage API로 먼저 지우고 아래 함수를 부른다.
+
+-- 인정된 인증을 지우면, 같은 날 사진만 저장된 인증 중 가장 먼저 올린 것을 인정으로 올린다
+create or replace function public.promote_next_checkin()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if old.counted then
+    update public.checkins set counted = true
+    where id = (select c.id from public.checkins c
+                where c.group_id = old.group_id and c.user_id = old.user_id
+                  and c.check_date = old.check_date and not c.counted
+                order by c.created_at limit 1);
+  end if;
+  return old;
+end $$;
+
+drop trigger if exists checkin_promote_next on public.checkins;
+create trigger checkin_promote_next after delete on public.checkins
+  for each row execute function public.promote_next_checkin();
+
+-- 한 사람을 그룹에서 빼기: 그룹장이면 다음으로 일찍 들어온 멤버에게 넘기고, 혼자면 그룹을 지운다 (내부용)
+create or replace function public.release_membership(p_uid uuid, p_group uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  next_owner uuid;
+begin
+  if exists (select 1 from public.groups where id = p_group and owner_id = p_uid) then
+    select user_id into next_owner from public.group_members
+    where group_id = p_group and user_id <> p_uid order by joined_at limit 1;
+    if next_owner is null then
+      delete from public.groups where id = p_group;   -- 마지막 멤버: 그룹째 삭제 (멤버·인증·찌르기 함께)
+      return;
+    end if;
+    update public.groups set owner_id = next_owner where id = p_group;
+    update public.group_members set role = 'owner' where group_id = p_group and user_id = next_owner;
+  end if;
+  delete from public.checkins where group_id = p_group and user_id = p_uid;
+  delete from public.group_members where group_id = p_group and user_id = p_uid;
+end $$;
+
+-- 그룹 나가기: 내 인증 기록도 그 그룹에서 지운다
+create or replace function public.leave_group(p_group_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_LOGGED_IN'; end if;
+  if not public.is_group_member(p_group_id) then raise exception 'NOT_A_MEMBER'; end if;
+  perform public.release_membership(auth.uid(), p_group_id);
+end $$;
+
+-- 계정 삭제 (내부용): 모든 그룹에서 빠진 뒤 auth 사용자 삭제 → 프로필·기록이 함께 지워진다
+create or replace function public.delete_user_account(p_uid uuid)
+returns void language plpgsql security definer set search_path = public, auth as $$
+declare
+  g uuid;
+begin
+  for g in select group_id from public.group_members where user_id = p_uid loop
+    perform public.release_membership(p_uid, g);
+  end loop;
+  delete from auth.users where id = p_uid;
+end $$;
+
+-- 회원 탈퇴 (본인)
+create or replace function public.delete_my_account()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_LOGGED_IN'; end if;
+  perform public.delete_user_account(auth.uid());
+end $$;
+
+-- 카카오 연결 해제 웹훅용 (서버 전용, service_role): 카카오 회원번호 → 우리 사용자 id + 지울 사진 경로
+create or replace function public.kakao_unlink_target(p_kakao_id text)
+returns table (user_id uuid, photo_paths text[])
+language sql stable security definer set search_path = public, auth as $$
+  select u.id,
+         coalesce((select array_agg(c.photo_path) from public.checkins c where c.user_id = u.id), '{}')
+  from auth.users u
+  where u.raw_user_meta_data ->> 'sub' = p_kakao_id
+     or u.raw_user_meta_data ->> 'provider_id' = p_kakao_id
+  limit 1
+$$;
+
+-- ---------------------------------------------------------------------
 -- 10. 함수 실행 권한
 -- ---------------------------------------------------------------------
 
 revoke execute on all functions in schema public from public, anon;
+-- 주의: Supabase는 새 함수에 authenticated 실행 권한을 자동으로 준다.
+-- 내부용 함수(다른 사람 계정·그룹을 건드릴 수 있는 것)는 반드시 따로 막는다.
+revoke execute on function
+  public.release_membership(uuid, uuid),
+  public.delete_user_account(uuid),
+  public.kakao_unlink_target(text),
+  public.promote_next_checkin(),
+  public.handle_new_user(),
+  public.enforce_group_capacity()
+from public, anon, authenticated;
 grant execute on function
+  public.leave_group(uuid),
+  public.delete_my_account(),
   public.create_group(text, int, int),
   public.join_group(text),
   public.submit_checkin(uuid, text, timestamptz),
@@ -623,6 +719,8 @@ grant execute on function
   public.to_check_date(timestamptz),
   public.week_start(date)
 to authenticated;
+-- 서버(service_role) 전용
+grant execute on function public.kakao_unlink_target(text), public.delete_user_account(uuid) to service_role;
 grant execute on function public.get_invite_preview(text), public.haenya_today(),
   public.to_check_date(timestamptz), public.week_start(date)
 to anon, authenticated;

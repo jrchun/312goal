@@ -10,10 +10,14 @@ export const SILENT_DAYS = 3;
  *  기본 / 나 — 형광펜 밑줄 / 무소식 3일 이상 — 회색 취소선 + "N일째 무소식" + 찌르기
  */
 export function RankRow({
-  name, value, isMe, daysSilent, onPoke, poked, compact,
+  name, value, isMe, daysSilent, onPoke, poked, compact, rank, sub,
 }: {
   name: string;
   value: string;
+  /** 순위 번호 (그룹 화면). 1등은 빨강 */
+  rank?: number;
+  /** 오른쪽 작은 글씨 (예: "7 / 150") */
+  sub?: string;
   isMe?: boolean;
   daysSilent?: number;
   onPoke?: () => void;
@@ -26,6 +30,9 @@ export function RankRow({
     <View style={styles.row}>
       {isMe ? <View style={styles.highlight} /> : null}
       <View style={styles.left}>
+        {rank !== undefined ? (
+          <Text style={{ ...font.display, fontSize: 22, width: 26, color: rank === 1 ? color.red : color.black }}>{rank}</Text>
+        ) : null}
         <Text
           numberOfLines={1}
           style={[
@@ -40,7 +47,10 @@ export function RankRow({
       {silent && onPoke ? (
         <Button variant="poke" label={poked ? '찔렀다' : '찌르기'} onPress={onPoke} disabled={poked} />
       ) : (
-        <Text style={{ ...font.display, fontSize: size, lineHeight: size * 1.2, color: color.black }}>{value}</Text>
+        <View style={styles.right}>
+          <Text style={{ ...font.display, fontSize: compact ? size : 22, lineHeight: size * 1.2, color: color.black }}>{value}</Text>
+          {sub ? <Text style={[type.caption, styles.sub]}>{sub}</Text> : null}
+        </View>
       )}
     </View>
   );
@@ -62,4 +72,6 @@ const styles = StyleSheet.create({
   left: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
   strike: { textDecorationLine: 'line-through', textDecorationColor: color.red },
   silent: { ...font.bodyBold, fontSize: 12, color: color.textRed },
+  right: { flexDirection: 'row', alignItems: 'baseline', gap: space(3) },
+  sub: { minWidth: 56, textAlign: 'right' },
 });

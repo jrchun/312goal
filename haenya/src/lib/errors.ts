@@ -15,6 +15,7 @@ const messages: Record<string, string> = {
   BAD_PHOTO_PATH: '사진을 다시 올려줘.',
   UPLOAD_FAILED: '사진이 안 올라갔다. 다시 해봐.',
   PHOTO_UNREADABLE: '이 사진은 못 읽는다. 다른 사진으로 해봐.',
+  PHOTO_DELETE_FAILED: '사진이 안 지워졌다. 다시 해봐.',
 };
 
 export function errorMessage(error: unknown): string {

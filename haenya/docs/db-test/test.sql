@@ -110,3 +110,49 @@ select pg_temp.as_user('a');
 select rank as "순위", nickname as "이름", rank_weeks as "최근4주 채운 주(기대: 호4 성우3 고은3 민지2)",
        season_count as "시즌 누적", week_count as "이번 주"
 from group_week_board(:'gid') where nickname in ('호','고은','민지','성우');
+
+\echo '== 10. 인증 삭제 → 같은 날 다음 사진이 인정으로'
+reset role;
+select id as gid2 from groups limit 1 \gset
+insert into checkins (group_id,user_id,check_date,photo_path,date_verified,counted,created_at) values
+  (:'gid', pg_temp.uid('e'), haenya_today(), 'p1', true, true,  now() - interval '2 minutes'),
+  (:'gid', pg_temp.uid('e'), haenya_today(), 'p2', true, false, now() - interval '1 minutes');
+set role authenticated; select pg_temp.as_user('e');
+delete from checkins where photo_path = 'p1';
+reset role;
+select photo_path, counted as "p2 인정(t 기대)" from checkins where user_id = pg_temp.uid('e') and check_date = haenya_today();
+
+\echo '== 11. 내부 함수는 일반 사용자가 못 부른다'
+set role authenticated; select pg_temp.as_user('m');
+select pg_temp.try(format('select delete_user_account(%L)', pg_temp.uid('a'))) as "남의 계정 삭제 시도",
+       pg_temp.try(format('select release_membership(%L, %L)', pg_temp.uid('a'), :'gid')) as "남을 그룹에서 빼기 시도",
+       pg_temp.try($$select kakao_unlink_target('x')$$) as "웹훅 함수 직접 호출";
+
+\echo '== 12. 그룹장 나가기 → 다음 멤버가 그룹장'
+select pg_temp.as_user('a');
+select pg_temp.try(format('select leave_group(%L)', :'gid')) as "a 나가기";
+reset role;
+select p.nickname as "새 그룹장", m.role from groups g join profiles p on p.id = g.owner_id join group_members m on m.user_id = g.owner_id and m.group_id = g.id;
+select count(*) as "a의 인증 남은 수(0)" from checkins where user_id = pg_temp.uid('a');
+
+\echo '== 13. 회원 탈퇴 (b = 지금 그룹장) → 프로필·기록 삭제, 그룹장 넘어감'
+set role authenticated; select pg_temp.as_user('b');
+select pg_temp.try('select delete_my_account()') as "b 탈퇴";
+reset role;
+select (select count(*) from auth.users where id = pg_temp.uid('b')) as "b auth(0)",
+       (select count(*) from profiles where id = pg_temp.uid('b')) as "b 프로필(0)",
+       (select count(*) from checkins where user_id = pg_temp.uid('b')) as "b 인증(0)",
+       (select p.nickname from groups g join profiles p on p.id = g.owner_id) as "새 그룹장";
+
+\echo '== 14. 혼자 남은 그룹에서 나가면 그룹 삭제'
+insert into auth.users (id, raw_user_meta_data) values (md5('solo')::uuid, '{"name":"솔로"}');
+set role authenticated; select set_config('request.jwt.claim.sub', md5('solo'), false);
+select id as solo_gid from create_group('혼자방') \gset
+select pg_temp.try(format('select leave_group(%L)', :'solo_gid')) as "솔로 나가기";
+reset role;
+select count(*) as "혼자방 남음(0)" from groups where name = '혼자방';
+
+\echo '== 15. 웹훅용 함수 (service_role)'
+set role service_role;
+select user_id is not null as "찾음", cardinality(photo_paths) >= 0 as ok from kakao_unlink_target('nobody');
+select count(*) as "없는 카카오 id → 0행" from kakao_unlink_target('nobody');
