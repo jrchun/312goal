@@ -154,6 +154,7 @@
 - `InstallGuide`(`src/components/InstallGuide.tsx`) + `src/lib/env.web.ts`(어디서 열렸나): 카톡 안 → `kakaotalk://web/openExternal`로 Safari/크롬 열기, 아이폰 Safari → 공유 → 홈 화면에 추가, 안드로이드 크롬 → 설치 창.
 - **1회용 이어가기 열쇠**: `create_transfer_token`(로그인된 곳, 기본 10분·최대 30분) → `/continue?t=`(바로 로그인) 또는 `/install?t=&code=`(아이폰 홈 화면 아이콘 첫 실행 때만 로그인, Safari 탭에선 안내만) → `/api/transfer` → `redeem_transfer_token`(한 번만).
 - 홈 화면 앱 설정 파일은 `/api/manifest`(Pages Function). `?start=`로 시작 주소를 바꾼다 → 아이폰은 추가하는 순간의 시작 주소(열쇠 포함)를 쓴다. 안드로이드 크롬은 크롬과 로그인을 같이 써서 열쇠가 필요 없다.
+- 기존 유저용 입구: 홈의 한 줄 안내(`InstallHint`, ✕로 닫으면 그 브라우저에선 안 보임) + 마이 맨 위 "홈 화면에 넣기" + 설정. 홈 화면 앱으로 열었거나 컴퓨터면 숨김.
 - 월요일 홈 맨 위: 지난주 결산(`group_week_summary`) + 주간 결산 스토리 카드(`makeWeeklyCard`, 검정 바탕, 그룹 합계만).
 - 링크 미리보기: `+html.tsx`의 og 태그 + `public/og.png`(1200×630). 카톡은 미리보기를 캐시하니 바꾸면 카카오 "공유 디버거"로 캐시를 지워야 한다.
 

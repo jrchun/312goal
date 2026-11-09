@@ -12,6 +12,7 @@ import { errorMessage } from '../../lib/errors';
 import { makeNudgeCard, makeWeeklyCard } from '../../lib/cards';
 import { shareImage } from '../../lib/share';
 import { SaveImageSheet } from '../../components/SaveImageSheet';
+import { InstallHint } from '../../components/InstallHint';
 import { siteUrl } from '../../lib/invite';
 import { shareCardToKakao } from '../../lib/kakao';
 import { callName } from '../../lib/korean';
@@ -170,6 +171,9 @@ export default function Home() {
           onPress={() => router.push('/checkin')}
         />
       </View>
+      <View style={styles.hint}>
+        <InstallHint />
+      </View>
 
       <View style={styles.sectionHead}>
         <Label>이번 주 순위</Label>
@@ -205,7 +209,8 @@ const styles = StyleSheet.create({
   headline: { color: color.red, paddingTop: space(2), paddingBottom: space(2) },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(3) },
   sentence: { color: color.black, flexShrink: 1 },
-  cta: { paddingVertical: space(5) },
+  cta: { paddingTop: space(5), paddingBottom: space(3) },
+  hint: { paddingBottom: space(5) },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   list: { paddingTop: space(1) },
   alone: { paddingTop: space(3) },

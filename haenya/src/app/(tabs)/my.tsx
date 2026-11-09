@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
+import { useCanInstall } from '../../components/InstallHint';
 import { Label } from '../../components/Form';
 import { PhotoGrid } from '../../components/PhotoGrid';
 import { PhotoViewer, ViewerPhoto } from '../../components/PhotoViewer';
@@ -24,6 +25,7 @@ export default function My() {
   const [photos, setPhotos] = useState<CheckinRow[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
+  const canInstall = useCanInstall();
 
   const load = useCallback(async () => {
     if (!group || !session) return;
@@ -88,7 +90,10 @@ export default function My() {
         <Text style={[type.caption, { color: color.black }]} numberOfLines={1}>
           {profile?.nickname} · {group?.name}
         </Text>
-        <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
+        <View style={styles.links}>
+          {canInstall ? <Button variant="text" label="홈 화면에 넣기" onPress={() => router.push('/onboarding?step=install' as never)} /> : null}
+          <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
+        </View>
       </View>
       <Label>{stats?.season_year ?? checkDate().slice(0, 4)} 시즌 누적</Label>
       <Text style={[type.progress, styles.big]}>
@@ -167,6 +172,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 const styles = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space(2) },
+  links: { flexDirection: 'row', gap: space(4) },
   big: { color: color.black, paddingTop: space(1) },
   gapRule: { paddingVertical: space(4) },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: space(2) },
