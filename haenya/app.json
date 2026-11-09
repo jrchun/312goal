@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "했냐",
+    "slug": "haenya",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F1EDE4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "static",
+      "bundler": "metro",
+      "name": "했냐",
+      "shortName": "했냐",
+      "backgroundColor": "#F1EDE4",
+      "themeColor": "#F1EDE4",
+      "lang": "ko"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "scheme": "haenya",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
