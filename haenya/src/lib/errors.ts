@@ -16,6 +16,13 @@ const messages: Record<string, string> = {
   UPLOAD_FAILED: '사진이 안 올라갔다. 다시 해봐.',
   PHOTO_UNREADABLE: '이 사진은 못 읽는다. 다른 사진으로 해봐.',
   PHOTO_DELETE_FAILED: '사진이 안 지워졌다. 다시 해봐.',
+  BAD_PIN: '숫자 4자리로 해줘.',
+  WRONG: '숫자가 틀렸다.',
+  LOCKED: '너무 많이 틀렸다. 15분 뒤에 다시 해봐.',
+  NO_PIN: '숫자를 안 정한 계정이다. 그룹장한테 초기화해달라고 해.',
+  NOT_OWNER: '그룹장만 할 수 있다.',
+  REGISTER_FAILED: '가입이 안 됐다. 잠깐 뒤에 다시 해봐.',
+  RESTORE_FAILED: '되찾기가 안 됐다. 다시 해봐.',
 };
 
 export function errorMessage(error: unknown): string {

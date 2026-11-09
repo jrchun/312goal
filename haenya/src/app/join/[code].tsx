@@ -1,14 +1,13 @@
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Notice } from '../../components/Form';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { Wordmark } from '../../components/Wordmark';
-import { signInWithKakao } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
-import { useSession } from '../../lib/session';
+import { profileComplete, useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import type { InvitePreview } from '../../lib/types';
 import { color, line, space, type } from '../../theme';
@@ -25,6 +24,14 @@ export default function Join() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const joining = useRef(false);
+  // 화면 아래에 깔려 있는(안 보이는) 초대 화면이 같이 합류 요청을 보내지 않게, 보이는 화면만 합류한다
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
 
   useEffect(() => {
     if (!code || code === '[CODE]') return;
@@ -35,10 +42,10 @@ export default function Join() {
   }, [code]);
 
   const loggedIn = !s.loading && !!s.session;
-  const agreed = !!s.profile?.terms_agreed_at;
+  const agreed = profileComplete(s);
   const alreadyHere = s.membership?.group.invite_code === code;
   const otherGroup = !!s.membership && !alreadyHere;
-  const canAutoJoin = loggedIn && agreed && !s.membership && !!preview && !preview.is_full;
+  const canAutoJoin = focused && loggedIn && agreed && !s.membership && !!preview && !preview.is_full;
 
   useEffect(() => {
     if (!canAutoJoin || joining.current) return;
@@ -58,14 +65,7 @@ export default function Join() {
 
   if (loggedIn && !agreed) return <Redirect href={`/login?next=${encodeURIComponent(`/join/${code}`)}` as never} />;
 
-  const join = async () => {
-    setError('');
-    try {
-      await signInWithKakao(`/join/${code}`);
-    } catch {
-      setError('카카오 로그인이 안 열렸다. 다시 해봐.');
-    }
-  };
+  const join = () => router.push(`/login?next=${encodeURIComponent(`/join/${code}`)}` as never);
 
   const invalid = preview === null;
   const inviter = preview?.owner_nickname;
@@ -122,14 +122,14 @@ export default function Join() {
           </>
         ) : (
           <Button
-            label="카카오 계정으로 참여"
+            label="참여하기"
             onPress={join}
             busy={busy || preview === undefined || (loggedIn && canAutoJoin)}
             disabled={!!preview?.is_full}
           />
         )}
         {!loggedIn && !invalid ? (
-          <Button variant="text" label="우리 그룹 새로 만들기" onPress={() => router.push('/')} />
+          <Button variant="text" label="나 이미 있어. 내 기록 찾기" onPress={() => router.push(`/restore?code=${code}` as never)} />
         ) : null}
         <Text style={[type.caption, styles.center]}>앱 설치 없이 웹에서 바로 시작</Text>
       </View>

@@ -27,8 +27,9 @@
 |---|---|---|
 | `/` 일반 랜딩 | `src/app/index.tsx` | STAGE 7 |
 | `/join/[code]` 초대 랜딩 | `src/app/join/[code].tsx` | STAGE 3 |
-| `/login` 카카오 로그인 + 약관 | `src/app/login.tsx` | STAGE 3 |
-| `/auth/kakao` 카카오 로그인 후 돌아오는 곳 | `src/app/auth/kakao.tsx` | STAGE 3 |
+| `/login` 시작하기: 성·이름·4자리·약관 (기기 등록) | `src/app/login.tsx` | STAGE 3 |
+| `/restore` 나 이미 있어: 이름 + 4자리로 되찾기 | `src/app/restore.tsx` | STAGE 3 |
+| `/auth/kakao` 카카오 로그인 후 돌아오는 곳 (보조) | `src/app/auth/kakao.tsx` | STAGE 3 |
 | `/joined` 그룹 합류 확인 + 내 올해 목표 | `src/app/joined.tsx` | STAGE 3 |
 | `/terms` `/privacy` 약관 (초안은 STAGE 8) | `src/app/terms.tsx`, `privacy.tsx` | STAGE 3·8 |
 | `/create-group` | `src/app/create-group.tsx` | STAGE 3 |
@@ -40,13 +41,17 @@
 
 `public/_redirects`가 `/join/*`을 `/join/[code]`로 돌린다(Cloudflare Pages).
 
-로그인 흐름 (카카오 OpenID Connect 직접 연동 — Supabase 기본 카카오 연동은 쓰지 않는다):
-`signInWithKakao(next)`(`src/lib/auth.web.ts`)가 scope 없이 카카오 인가 화면으로 보냄 → `/auth/kakao`(`src/app/auth/kakao.tsx`)로 돌아옴 →
-Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시크릿으로 code를 ID 토큰으로 교환 → `supabase.auth.signInWithIdToken({provider:'kakao'})` → `nextRoute()`.
-이유: Supabase의 `signInWithOAuth('kakao')`는 이메일 권한(account_email)을 강제로 요청하는데, 이메일 동의항목은 비즈 앱 + 심사가 있어야 해서 KOE205가 난다.
-카카오 콘솔 필요 설정: OpenID Connect ON, REST API 키 리다이렉트 URI에 `https://haenya.pages.dev/auth/kakao`. Cloudflare 변수: KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret), EXPO_PUBLIC_KAKAO_REST_KEY.
-`/api/kakao-token`은 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 로그인 끝까지 테스트할 수 없다(배포 주소에서 테스트).
-약관 미동의 → `/login`(동의 단계), 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
+로그인 = **기기 등록 + 이름·숫자 4자리로 되찾기** (사용자 확정 2026-11-09. 카카오 로그인은 나중에 확대용으로 남김):
+- 시작하기(`/login`): 성·이름·숫자 4자리·약관 한 화면 → `registerDevice()`(`src/lib/device-auth.ts`): `/api/register`가 가짜 이메일(무작위@users.haenya.app)+비밀번호를 주고 `supabase.auth.signUp`. 이 브라우저는 계속 자동 로그인.
+- 나 이미 있어(`/restore?code=`): 초대 코드로 멤버 목록(`restore_candidates`) → 이름 고르고 4자리 → `/api/restore`가 DB `verify_pin`(5번 틀리면 15분 잠금)으로 확인 → 같은 비밀번호를 다시 만들어 `signInWithPassword`.
+- 비밀번호 = HMAC-SHA256(Cloudflare Secret `HAENYA_AUTH_SECRET`, 이메일). **⚠️ 이 Secret을 바꾸면 모든 사용자의 되찾기가 깨진다. 절대 바꾸지 말 것.**
+- 숫자 4자리는 `user_pins`(bcrypt, 앱에서 직접 접근 불가). 그룹장이 `reset_member_pin`으로 임시 숫자 발급 → 그 멤버는 들어오면 새 숫자를 정해야 한다(`is_temp`).
+- 이름은 성(`family_name`)·이름(`given_name`) 따로. 화면·찌르기에는 이름만(`displayName()`, 보드의 nickname = 이름). `nickname`은 성+이름 전체.
+- Supabase 설정: 이메일 로그인 ON, **"Confirm email" OFF** 여야 가입이 된다(사용자가 대시보드에서).
+- 같은 휴대폰이라도 카톡 브라우저·Safari·홈 화면 아이콘은 저장소가 따로라 각자 처음 한 번 되찾기가 필요하다. 기기 특징으로 추측해 자동 연결(핑거프린팅)은 하지 않는다(오인식·개인정보).
+- 카카오(예전 방식, 보조): `signInWithKakao`(`src/lib/auth.web.ts`) → `/auth/kakao` → `functions/api/kakao-token.ts` → `signInWithIdToken`. 되찾기 화면에서 카카오 계정만 "카카오로 이어가기"로 쓴다.
+`/api/*`는 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 가입·되찾기를 끝까지 테스트할 수 없다(배포 주소에서 테스트).
+프로필 미완성(약관·성이름·4자리, 임시 숫자) → `/login`, 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
 로그인 상태·프로필·내 그룹은 `useSession()`으로 읽는다. 탭 화면은 로그인+약관+그룹이 없으면 들어올 수 없다.
 
 ## 디자인 규칙 (가이드라인 요약)

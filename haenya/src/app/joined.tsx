@@ -6,7 +6,7 @@ import { Notice, Stepper } from '../components/Form';
 import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { TopBar } from '../components/TopBar';
-import { useSession } from '../lib/session';
+import { displayName, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
 import { color, space, type } from '../theme';
 
@@ -50,7 +50,7 @@ export default function Joined() {
       <Text style={styles.title} adjustsFontSizeToFit numberOfLines={2}>들어왔다.</Text>
       <Rule />
       <Text style={[type.sentence, styles.sentence]}>
-        {s.profile?.nickname}. 이제 {m.group.name} 멤버다.{'\n'}내 올해 목표만 정하자.
+        {displayName(s.profile)}. 이제 {m.group.name} 멤버다.{'\n'}내 올해 목표만 정하자.
       </Text>
       <View style={styles.form}>
         <Stepper label="내 올해 목표" value={goal} onChange={setGoal} min={10} max={366} step={10} unit="회" />

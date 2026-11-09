@@ -7,7 +7,7 @@ import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { errorMessage } from '../lib/errors';
 import { copyOrShareInvite, inviteUrl } from '../lib/invite';
-import { useSession } from '../lib/session';
+import { profileComplete, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../lib/types';
 import { color, space, type } from '../theme';
@@ -24,7 +24,7 @@ export default function CreateGroup() {
 
   if (created) return <Created group={created} />;
   if (!s.loading && !s.session) return <Redirect href="/login?next=/create-group" />;
-  if (!s.loading && s.session && !s.profile?.terms_agreed_at) return <Redirect href="/login?next=/create-group" />;
+  if (!s.loading && s.session && !profileComplete(s)) return <Redirect href="/login?next=/create-group" />;
   if (!s.loading && s.membership) return <Redirect href="/home" />;
 
   const submit = async () => {

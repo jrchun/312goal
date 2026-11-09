@@ -97,6 +97,7 @@ const styles = StyleSheet.create({
     borderBottomColor: color.black,
     outlineStyle: 'none',
   } as object,
+  pin: { ...font.display, fontSize: 40, letterSpacing: 18, paddingVertical: space(1) },
   stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   stepBtn: {
     width: layout.minTouch + space(2),
@@ -115,3 +116,27 @@ const styles = StyleSheet.create({
   boxOn: { backgroundColor: color.black },
   tick: { color: color.cream, ...font.bodyBold, fontSize: 15, lineHeight: 18 },
 });
+
+/** 숫자 4자리 입력: 숫자 키패드, 가려서 표시, 큰 글자 */
+export function PinField({
+  label, value, onChange, autoFocus, onSubmit,
+}: { label: string; value: string; onChange: (v: string) => void; autoFocus?: boolean; onSubmit?: () => void }) {
+  return (
+    <View style={styles.block}>
+      <Label>{label}</Label>
+      <TextInput
+        value={value}
+        onChangeText={(t) => onChange(t.replace(/[^0-9]/g, '').slice(0, 4))}
+        keyboardType="number-pad"
+        inputMode="numeric"
+        secureTextEntry
+        autoComplete="off"
+        autoFocus={autoFocus}
+        onSubmitEditing={onSubmit}
+        placeholder="····"
+        placeholderTextColor={color.gray}
+        style={[styles.input, styles.pin]}
+      />
+    </View>
+  );
+}

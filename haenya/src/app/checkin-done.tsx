@@ -12,7 +12,7 @@ import { countWord, isoWeek, stickerTime } from '../lib/dates';
 import { siteUrl } from '../lib/invite';
 import { shareCardToKakao } from '../lib/kakao';
 import { ordinalWord } from '../lib/korean';
-import { useSession } from '../lib/session';
+import { displayName, useSession } from '../lib/session';
 import { shareImage } from '../lib/share';
 import { color, space, type } from '../theme';
 
@@ -33,7 +33,7 @@ export default function CheckinDone() {
       photoUrl: r.previewUrl,
       groupName: membership.group.name,
       weekLabel: `W${String(isoWeek(r.check_date)).padStart(2, '0')}`,
-      nickname: profile?.nickname ?? '',
+      nickname: displayName(profile),
       weekCount: r.week_count,
       weeklyGoal: r.weekly_goal,
       memo: r.counted ? `이번 주 ${ordinalWord(r.week_count)} 번째` : '오늘 한 장 더',
@@ -99,7 +99,7 @@ export default function CheckinDone() {
       <Text style={[type.rankName, styles.title]}>{title}</Text>
       <Rule />
       <Text style={[type.sentence, styles.sentence]}>
-        {profile?.nickname ? `${profile.nickname}. ` : ''}
+        {displayName(profile) ? `${displayName(profile)}. ` : ''}
         {sentence}
       </Text>
       {!r.date_verified ? (

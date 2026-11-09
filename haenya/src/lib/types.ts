@@ -2,6 +2,8 @@
 export type Profile = {
   id: string;
   nickname: string;
+  family_name: string | null;
+  given_name: string | null;
   avatar_url: string | null;
   terms_agreed_at: string | null;
 };
@@ -77,3 +79,8 @@ export type MyStats = {
 
 /** my_weeks() 한 줄 */
 export type MyWeek = { week: string; cnt: number; achieved: boolean; is_current: boolean };
+
+export type PinStatus = { has_pin: boolean; is_temp: boolean };
+
+/** restore_candidates() 한 줄 */
+export type RestoreCandidate = { user_id: string; family_name: string | null; given_name: string | null; display_name: string; can_pin: boolean };

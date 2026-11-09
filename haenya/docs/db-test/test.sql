@@ -156,3 +156,35 @@ select count(*) as "혼자방 남음(0)" from groups where name = '혼자방';
 set role service_role;
 select user_id is not null as "찾음", cardinality(photo_paths) >= 0 as ok from kakao_unlink_target('nobody');
 select count(*) as "없는 카카오 id → 0행" from kakao_unlink_target('nobody');
+
+\echo '== 16. 기기 등록: 성/이름 + 4자리 되찾기'
+reset role;
+insert into auth.users (id, raw_user_meta_data, email) values
+  (md5('dev1')::uuid, '{"name":"천성우","family_name":"천","given_name":"성우"}', 'aaa@users.haenya.app'),
+  (md5('dev2')::uuid, '{"name":"김민지","family_name":"김","given_name":"민지"}', 'bbb@users.haenya.app');
+select nickname, family_name, given_name from profiles where id in (md5('dev1')::uuid, md5('dev2')::uuid) order by nickname;
+set role authenticated; select set_config('request.jwt.claim.sub', md5('dev1'), false);
+update profiles set terms_agreed_at = now() where id = md5('dev1')::uuid;
+select invite_code as dcode, id as dgid from create_group('기기방') \gset
+select pg_temp.try($$select set_my_pin('12a4')$$) as "잘못된 숫자 형식", pg_temp.try($$select set_my_pin('1234')$$) as "숫자 정하기";
+select * from my_pin_status();
+select pg_temp.try('select * from user_pins') as "숫자 표 직접 읽기";
+select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select pg_temp.try(format('select join_group(%L)', :'dcode')) as "민지 합류", pg_temp.try($$select set_my_pin('9999')$$) as "민지 숫자";
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select display_name, given_name, can_pin from restore_candidates(lower(:'dcode'));
+select * from verify_pin(md5('dev1')::uuid, '1234') as "맞는 숫자";
+select status from verify_pin(md5('dev1')::uuid, '0000') as "틀린 숫자";
+select string_agg(status, ' ') as "4번 더 틀림 → 마지막은 잠금 전" from (select (verify_pin(md5('dev1')::uuid, '0000')).status from generate_series(1,4)) x;
+select status as "잠긴 뒤 맞는 숫자(LOCKED)" from verify_pin(md5('dev1')::uuid, '1234');
+set role authenticated; select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select pg_temp.try(format('select reset_member_pin(%L, %L)', :'dgid', md5('dev1'))) as "그룹장 아닌 사람이 초기화";
+select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select reset_member_pin(:'dgid', md5('dev2')::uuid) as temp_pin \gset
+select length(:'temp_pin') as "임시 숫자 길이(4)";
+reset role; set role anon;
+select status as "민지 임시 숫자로 되찾기" from verify_pin(md5('dev2')::uuid, :'temp_pin');
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select is_temp as "임시 표시(t)" from my_pin_status();
+select pg_temp.try($$select set_my_pin('2468')$$) as "새 숫자", (select is_temp from my_pin_status()) as "임시 해제(f)";
+select nickname as "보드에는 이름만" from group_week_board(:'dgid') order by 1;

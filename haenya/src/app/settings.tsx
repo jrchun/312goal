@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
-import { Field, Label, Notice, Stepper } from '../components/Form';
+import { Field, Label, Notice, PinField, Stepper } from '../components/Form';
 import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { deleteMyAccount, leaveGroup } from '../lib/account';
@@ -10,6 +10,7 @@ import { errorMessage } from '../lib/errors';
 import { copyOrShareInvite } from '../lib/invite';
 import { useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
+import type { RestoreCandidate } from '../lib/types';
 import { color, line, space, type } from '../theme';
 
 type Msg = { text: string; tone: 'info' | 'error' } | null;
@@ -22,7 +23,10 @@ export default function Settings() {
   const uid = s.session?.user.id;
   const isOwner = !!g && g.owner_id === uid;
 
-  const [nickname, setNickname] = useState(s.profile?.nickname ?? '');
+  const [family, setFamily] = useState(s.profile?.family_name ?? '');
+  const [given, setGiven] = useState(s.profile?.given_name ?? '');
+  const [newPin, setNewPin] = useState('');
+  const [members, setMembers] = useState<RestoreCandidate[]>([]);
   const [myGoal, setMyGoal] = useState(m?.season_goal ?? 150);
   const [gName, setGName] = useState(g?.name ?? '');
   const [gWeekly, setGWeekly] = useState(g?.weekly_goal ?? 3);
@@ -32,7 +36,10 @@ export default function Settings() {
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    if (s.profile) setNickname(s.profile.nickname);
+    if (s.profile) {
+      setFamily(s.profile.family_name ?? '');
+      setGiven(s.profile.given_name ?? '');
+    }
     if (m) setMyGoal(m.season_goal);
     if (g) {
       setGName(g.name);
@@ -40,6 +47,13 @@ export default function Settings() {
       setGSeason(g.season_goal);
     }
   }, [s.profile, m, g]);
+
+  useEffect(() => {
+    if (!isOwner || !g) return;
+    supabase.rpc('restore_candidates', { p_code: g.invite_code }).then(({ data }) =>
+      setMembers(((data as RestoreCandidate[]) ?? []).filter((x) => x.user_id !== uid)),
+    );
+  }, [isOwner, g, uid]);
 
   const say = (key: string, text: string, tone: 'info' | 'error' = 'info') => setMsg((x) => ({ ...x, [key]: { text, tone } }));
 
@@ -63,14 +77,46 @@ export default function Settings() {
       <Rule />
 
       <Section>
-        <Field label="닉네임" value={nickname} onChangeText={setNickname} maxLength={20} />
+        <View style={styles.nameRow}>
+          <View style={styles.family}>
+            <Field label="성" value={family} onChangeText={setFamily} maxLength={5} />
+          </View>
+          <View style={styles.given}>
+            <Field label="이름" value={given} onChangeText={setGiven} maxLength={10} />
+          </View>
+        </View>
         <Notice tone={msg.nick?.tone}>{msg.nick?.text}</Notice>
         <Button
           variant="secondary"
-          label="닉네임 저장"
+          label="이름 저장"
           busy={busy === 'nick'}
-          disabled={!nickname.trim() || nickname.trim() === s.profile?.nickname}
-          onPress={() => run('nick', () => supabase.from('profiles').update({ nickname: nickname.trim() }).eq('id', uid!), '바꿨다.')}
+          disabled={!family.trim() || !given.trim() || (family.trim() === s.profile?.family_name && given.trim() === s.profile?.given_name)}
+          onPress={() =>
+            run(
+              'nick',
+              () =>
+                supabase
+                  .from('profiles')
+                  .update({ family_name: family.trim(), given_name: given.trim(), nickname: `${family.trim()}${given.trim()}` })
+                  .eq('id', uid!),
+              '바꿨다.',
+            )
+          }
+        />
+      </Section>
+
+      <Section>
+        <PinField label="내 숫자 4자리 바꾸기" value={newPin} onChange={setNewPin} />
+        <Notice tone={msg.pin?.tone}>{msg.pin?.text}</Notice>
+        <Button
+          variant="secondary"
+          label="숫자 저장"
+          busy={busy === 'pin'}
+          disabled={newPin.length !== 4}
+          onPress={async () => {
+            await run('pin', () => supabase.rpc('set_my_pin', { p_pin: newPin }), '바꿨다. 새 숫자 잊지 마.');
+            setNewPin('');
+          }}
         />
       </Section>
 
@@ -110,6 +156,32 @@ export default function Settings() {
               )
             }
           />
+        </Section>
+      ) : null}
+
+      {isOwner && g && members.length ? (
+        <Section>
+          <Label>멤버 숫자 초기화 · 그룹장만</Label>
+          <Text style={[type.caption]}>숫자를 잊은 멤버만. 임시 숫자가 나오면 그 멤버한테 직접 알려줘.</Text>
+          <Notice tone={msg.reset?.tone}>{msg.reset?.text}</Notice>
+          {members.map((mm) => (
+            <View key={mm.user_id} style={styles.memberRow}>
+              <Text style={[type.sentence, { color: color.black }]}>{mm.display_name}</Text>
+              {mm.can_pin ? (
+                <Button
+                  variant="text"
+                  label="초기화"
+                  onPress={async () => {
+                    const { data, error } = await supabase.rpc('reset_member_pin', { p_group_id: g.id, p_user: mm.user_id });
+                    if (error) return say('reset', errorMessage(error), 'error');
+                    say('reset', `${mm.given_name ?? mm.display_name} 임시 숫자: ${data as string}. 들어오면 새 숫자로 바꾸게 된다.`);
+                  }}
+                />
+              ) : (
+                <Text style={type.caption}>카카오 계정</Text>
+              )}
+            </View>
+          ))}
         </Section>
       ) : null}
 
@@ -215,4 +287,8 @@ const styles = StyleSheet.create({
   title: { ...type.rankName, fontSize: 56, lineHeight: 60, color: color.black, paddingBottom: space(3) },
   section: { gap: space(3), paddingTop: space(6), borderBottomWidth: line.row, borderBottomColor: color.black, paddingBottom: space(6) },
   warn: { color: color.textRed },
+  nameRow: { flexDirection: 'row', gap: space(4) },
+  family: { width: 96 },
+  given: { flex: 1 },
+  memberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

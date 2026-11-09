@@ -47,6 +47,20 @@ create table if not exists public.profiles (
   created_at      timestamptz not null default now()
 );
 
+-- 성·이름 따로 (화면·찌르기에서는 이름만 쓴다). nickname = 성+이름 전체
+alter table public.profiles add column if not exists family_name text check (char_length(family_name) between 1 and 5);
+alter table public.profiles add column if not exists given_name  text check (char_length(given_name) between 1 and 10);
+
+-- 기기 등록 로그인의 "되찾기" 숫자 4자리. 암호화(bcrypt)해서 저장, 앱에서 직접 읽거나 쓸 수 없다(함수로만)
+create table if not exists public.user_pins (
+  user_id      uuid primary key references public.profiles (id) on delete cascade,
+  pin_hash     text not null,
+  is_temp      boolean not null default false,   -- 그룹장이 초기화한 임시 숫자면 true → 들어오면 새 숫자로 바꾸게 함
+  failed_count int not null default 0,
+  locked_until timestamptz,
+  updated_at   timestamptz not null default now()
+);
+
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
   name        text not null check (char_length(name) between 1 and 20),
@@ -131,7 +145,7 @@ create table if not exists public.push_tokens (
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, nickname, avatar_url)
+  insert into public.profiles (id, nickname, avatar_url, family_name, given_name)
   values (
     new.id,
     left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
@@ -139,7 +153,9 @@ begin
                   nullif(trim(new.raw_user_meta_data ->> 'nickname'), ''),
                   nullif(trim(new.raw_user_meta_data ->> 'preferred_username'), ''),
                   '친구'), 20),
-    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')
+    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture'),
+    left(nullif(trim(new.raw_user_meta_data ->> 'family_name'), ''), 5),
+    left(nullif(trim(new.raw_user_meta_data ->> 'given_name'), ''), 10)
   )
   on conflict (id) do nothing;
   return new;
@@ -210,13 +226,15 @@ alter table public.checkins      enable row level security;
 alter table public.reactions     enable row level security;
 alter table public.nudges        enable row level security;
 alter table public.push_tokens   enable row level security;
+alter table public.user_pins     enable row level security;  -- 정책 없음 = 앱에서 직접 접근 불가
 
 -- 수정 가능한 컬럼을 좁힌다 (예: 본인 role, 그룹 invite_code는 못 바꿈)
 revoke insert, update, delete on public.profiles, public.groups, public.group_members,
   public.seasons, public.checkins, public.reactions, public.nudges, public.push_tokens
   from anon, authenticated;
-grant insert (id, nickname, avatar_url, terms_agreed_at) on public.profiles to authenticated;
-grant update (nickname, avatar_url, terms_agreed_at)     on public.profiles to authenticated;
+revoke all on public.user_pins from anon, authenticated;
+grant insert (id, nickname, avatar_url, terms_agreed_at, family_name, given_name) on public.profiles to authenticated;
+grant update (nickname, avatar_url, terms_agreed_at, family_name, given_name)     on public.profiles to authenticated;
 grant update (name, weekly_goal, season_goal)            on public.groups to authenticated;
 grant update (season_goal)                               on public.group_members to authenticated;
 grant delete                                             on public.group_members to authenticated;
@@ -515,7 +533,7 @@ language sql stable as $$
     group by w.user_id
   ),
   base as (
-    select m.user_id, p.nickname, p.avatar_url, m.user_id = auth.uid() as is_me,
+    select m.user_id, coalesce(p.given_name, p.nickname) as nickname, p.avatar_url, m.user_id = auth.uid() as is_me,
            coalesce((select w.cnt from weeks w, today
                       where w.user_id = m.user_id and w.week = public.week_start(today.d)), 0) as week_count,
            g.weekly_goal,
@@ -686,6 +704,93 @@ language sql stable security definer set search_path = public, auth as $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- 9-2. 기기 등록 로그인: 이름 + 4자리로 되찾기
+-- ---------------------------------------------------------------------
+-- 계정 = 가짜 이메일(무작위@users.haenya.app) + 서버가 만든 긴 비밀번호. 사용자 눈엔 안 보인다.
+-- 새 브라우저·홈 화면 아이콘·새 폰에서는 그룹 멤버 목록에서 이름을 고르고 4자리를 넣어 되찾는다.
+-- 틀리면 5번마다 15분 잠금. 숫자는 bcrypt로 저장.
+
+create or replace function public.set_my_pin(p_pin text)
+returns void language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_LOGGED_IN'; end if;
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'BAD_PIN'; end if;
+  insert into public.user_pins (user_id, pin_hash, is_temp, failed_count, locked_until, updated_at)
+  values (auth.uid(), crypt(p_pin, gen_salt('bf', 8)), false, 0, null, now())
+  on conflict (user_id) do update
+    set pin_hash = excluded.pin_hash, is_temp = false, failed_count = 0, locked_until = null, updated_at = now();
+end $$;
+
+create or replace function public.my_pin_status()
+returns table (has_pin boolean, is_temp boolean)
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_pins where user_id = auth.uid()),
+         coalesce((select is_temp from public.user_pins where user_id = auth.uid()), false)
+$$;
+
+-- 되찾기 화면의 멤버 목록 (초대 코드를 아는 사람만, 로그인 전에도)
+create or replace function public.restore_candidates(p_code text)
+returns table (user_id uuid, family_name text, given_name text, display_name text, can_pin boolean)
+language sql stable security definer set search_path = public, auth as $$
+  select m.user_id, p.family_name, p.given_name,
+         coalesce(p.family_name || p.given_name, p.nickname),
+         exists (select 1 from public.user_pins u where u.user_id = m.user_id)
+           and exists (select 1 from auth.users a where a.id = m.user_id and a.email like '%@users.haenya.app')
+  from public.groups g
+  join public.group_members m on m.group_id = g.id
+  join public.profiles p on p.id = m.user_id
+  where g.invite_code = upper(trim(p_code))
+  order by m.joined_at
+$$;
+
+-- 4자리 확인. 맞으면 그 계정의 (가짜) 이메일을 돌려준다 → 서버(/api/restore)가 비밀번호를 만들어 로그인
+create or replace function public.verify_pin(p_user uuid, p_pin text)
+returns table (status text, email text)
+language plpgsql security definer set search_path = public, extensions, auth as $$
+#variable_conflict use_column
+declare
+  r public.user_pins;
+  addr text;
+begin
+  select a.email into addr from auth.users a where a.id = p_user and a.email like '%@users.haenya.app';
+  select * into r from public.user_pins where user_id = p_user for update;
+  if not found or addr is null then
+    return query select 'NO_PIN'::text, null::text; return;
+  end if;
+  if r.locked_until is not null and r.locked_until > now() then
+    return query select 'LOCKED'::text, null::text; return;
+  end if;
+  if r.pin_hash = crypt(p_pin, r.pin_hash) then
+    update public.user_pins set failed_count = 0, locked_until = null where user_id = p_user;
+    return query select 'OK'::text, addr; return;
+  end if;
+  update public.user_pins
+     set failed_count = case when failed_count + 1 >= 5 then 0 else failed_count + 1 end,
+         locked_until = case when failed_count + 1 >= 5 then now() + interval '15 minutes' else null end
+   where user_id = p_user;
+  return query select 'WRONG'::text, null::text;
+end $$;
+
+-- 그룹장이 멤버의 숫자를 초기화 → 임시 4자리를 돌려준다(그룹장이 멤버에게 알려줌)
+create or replace function public.reset_member_pin(p_group_id uuid, p_user uuid)
+returns text language plpgsql security definer set search_path = public, extensions as $$
+declare
+  pin text := lpad((floor(random() * 10000))::int::text, 4, '0');
+begin
+  if not exists (select 1 from public.groups where id = p_group_id and owner_id = auth.uid()) then
+    raise exception 'NOT_OWNER';
+  end if;
+  if not exists (select 1 from public.group_members where group_id = p_group_id and user_id = p_user) then
+    raise exception 'TARGET_NOT_IN_GROUP';
+  end if;
+  insert into public.user_pins (user_id, pin_hash, is_temp, failed_count, locked_until, updated_at)
+  values (p_user, crypt(pin, gen_salt('bf', 8)), true, 0, null, now())
+  on conflict (user_id) do update
+    set pin_hash = excluded.pin_hash, is_temp = true, failed_count = 0, locked_until = null, updated_at = now();
+  return pin;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 10. 함수 실행 권한
 -- ---------------------------------------------------------------------
 
@@ -701,6 +806,9 @@ revoke execute on function
   public.enforce_group_capacity()
 from public, anon, authenticated;
 grant execute on function
+  public.set_my_pin(text),
+  public.my_pin_status(),
+  public.reset_member_pin(uuid, uuid),
   public.leave_group(uuid),
   public.delete_my_account(),
   public.create_group(text, int, int),
@@ -721,6 +829,7 @@ grant execute on function
 to authenticated;
 -- 서버(service_role) 전용
 grant execute on function public.kakao_unlink_target(text), public.delete_user_account(uuid) to service_role;
+grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text) to anon, authenticated;
 grant execute on function public.get_invite_preview(text), public.haenya_today(),
   public.to_check_date(timestamptz), public.week_start(date)
 to anon, authenticated;
