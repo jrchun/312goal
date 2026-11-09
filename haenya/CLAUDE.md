@@ -121,6 +121,15 @@
 - 스키마를 바꾸면 `docs/db-test/run.sh`로 로컬 Postgres에서 검증한다.
 - 환경변수: `.env.example` → `.env.local` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
 
+## 배포 (Cloudflare Pages)
+
+- 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 기존 `312goal` 등 다른 Pages 프로젝트는 건드리지 않는다.
+- GitHub `jrchun/312goal` 연결. 배포 브랜치 `claude/eloquent-cori-4zjqre`(main 합치면 변경), 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`. 푸시하면 자동 배포.
+- 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL.
+- Claude는 Cloudflare API(api.cloudflare.com, Pages 편집 토큰, 프록시 자동 주입)로 프로젝트 설정·배포 상태를 확인한다.
+- 이 주소는 카카오 콘솔(플랫폼 Web, 앱 대표 도메인)과 Supabase Redirect URLs(`https://haenya.pages.dev/**`)에 등록돼 있어야 로그인이 된다.
+  Supabase 로그인 설정 변경은 Claude가 직접 못 한다(안전장치) → 사용자가 대시보드에서.
+
 ## 명령
 
 ```bash
