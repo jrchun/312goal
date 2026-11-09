@@ -168,6 +168,15 @@
 - 312goal 2026 기록 이관: `bash scripts/import-312goal.sh 2026`(옛 사이트 `../312goal/index.html`의 공개 키로 읽음) → `season_results`(시즌 합계만, 재실행하면 최신 숫자로 덮어씀). 옛 프로젝트는 공개 키로 읽기만. 실제 인원은 5명(천·호·고·혁·밤). **12월 31일 이후 한 번 더 실행.** group_id·user_id는 아직 비어 있음(비어 있으면 아무도 못 봄).
 - 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
 
+## 탭 이동 속도 (사용자 요청으로 개선)
+
+- 탭마다 **요청 1번**: `group_tab(gid)`, `my_tab(gid)`(jsonb 묶음, security invoker라 RLS 그대로) → `src/lib/tabData.ts`.
+- **임시 저장**(`src/lib/cache.ts`): 다시 열면 바로 그리고 뒤에서 새로 받는다(`useCache` + `fetchInto`). 로그아웃·탈퇴 시 비움.
+- **사진 주소 재사용**(`src/lib/photos.ts`): 서명 URL을 50분 재사용 → 다시 열어도 사진이 깜빡이거나 다시 내려받지 않음.
+- 홈이 뜨면 `router.prefetch('/group'|'/my')` + 두 탭 데이터를 미리 받아 둔다.
+- 처음 받기 전에는 0 같은 가짜 숫자 대신 "불러오는 중."을 보여준다.
+- 측정(실서버): 탭 내용 0.02~0.06초, 사진 0.02~0.08초 (전에는 1.2~3.4초 + 사진 깜빡임).
+
 ## DB (Supabase)
 
 - 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).
