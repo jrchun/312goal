@@ -31,7 +31,7 @@ export default function Checkin() {
     if (!file) return; // 고르기 취소
     setBusy(mode);
     try {
-      const photo = await preparePhoto(file).catch(() => {
+      const photo = await preparePhoto(file, mode).catch(() => {
         throw new Error('PHOTO_UNREADABLE');
       });
       setPreview(photo.previewUrl);

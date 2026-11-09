@@ -10,8 +10,10 @@ export type PreparedPhoto = {
   blob: Blob;
   /** 화면에 바로 보여줄 주소 (URL.createObjectURL) */
   previewUrl: string;
-  /** 촬영 시각. 사진에 정보가 없으면 null → "날짜 미확인" */
+  /** 촬영 시각. 알 수 없으면 null → "날짜 미확인" */
   takenAt: Date | null;
+  /** 촬영 시각을 어디서 얻었나: exif(사진 정보) / capture(방금 찍은 파일의 생성 시각) */
+  takenAtSource: 'exif' | 'capture' | null;
   width: number;
   height: number;
 };
@@ -81,8 +83,19 @@ async function decode(file: Blob): Promise<{ source: CanvasImageSource; width: n
   }
 }
 
-export async function preparePhoto(file: File): Promise<PreparedPhoto> {
-  const takenAt = await readTakenAt(file);
+/** "지금 찍기" 파일을 방금 찍은 것으로 보는 시간 범위 */
+const CAPTURE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * 아이폰은 "지금 찍기"(카메라 바로 촬영) 사진에서 촬영 시각(EXIF)을 지워서 넘긴다 (2026.11 실기기 확인).
+ * 그래서 카메라로 찍었고 EXIF 날짜가 없으면, 파일이 만들어진 시각(lastModified)이 10분 안일 때만 촬영 시각으로 쓴다.
+ * 앨범 사진은 EXIF가 그대로 남아 있어 그걸로 판정한다.
+ */
+export async function preparePhoto(file: File, mode: 'camera' | 'album' = 'album'): Promise<PreparedPhoto> {
+  const exifAt = await readTakenAt(file);
+  const fresh = Math.abs(Date.now() - file.lastModified) <= CAPTURE_WINDOW_MS;
+  const takenAt = exifAt ?? (mode === 'camera' && fresh ? new Date(file.lastModified) : null);
+  const takenAtSource = exifAt ? 'exif' : takenAt ? 'capture' : null;
   const { source, width, height } = await decode(file);
   const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
   const w = Math.round(width * scale);
@@ -97,5 +110,5 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('ENCODE_FAILED'))), 'image/jpeg', QUALITY),
   );
-  return { blob, previewUrl: URL.createObjectURL(blob), takenAt, width: w, height: h };
+  return { blob, previewUrl: URL.createObjectURL(blob), takenAt, takenAtSource, width: w, height: h };
 }

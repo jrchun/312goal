@@ -115,6 +115,9 @@ Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시�
 
 - 흐름: `pickPhoto`(지금 찍기=capture / 앨범) → `preparePhoto`(`src/lib/photo.web.ts`: EXIF 촬영 시각 읽기 → 긴 변 1600px JPEG로 다시 그림) → `submitCheckin`(`src/lib/checkin.ts`: 오늘 사진인지 먼저 거름 → Storage 업로드 → `submit_checkin` → 거절되면 사진 삭제) → `/checkin-done`.
 - canvas로 다시 그려서 **EXIF가 전부 빠진다(GPS 포함)**. 테스트로 확인함. EXIF 읽기는 `exifr/dist/lite.esm.mjs` — lite는 `pick` 옵션을 쓰면 오류가 나니 쓰지 말 것.
+- **실기기 확인(2026.11, 아이폰 카톡·Safari):** "지금 찍기" 사진은 아이폰이 촬영 시각·위치를 지워서 넘긴다. 앨범 사진은 EXIF(촬영 시각·위치)가 그대로 온다.
+  → 카메라 모드 + EXIF 날짜 없음 + 파일 생성 시각(lastModified)이 10분 안이면 그 시각을 촬영 시각으로 쓴다(`takenAtSource: 'capture'`). 앨범인데 EXIF 없으면 "날짜 미확인".
+- 진단용 숨은 화면 `/debug/photo`: 고른 사진의 메타정보를 서버에 보내지 않고 보여준다.
 - 날짜 계산은 `src/lib/dates.ts`(DB와 같은 규칙). 화면·사전 확인용이고 최종 판정은 DB.
 - 홈은 `group_week_board`를 화면에 올 때마다 다시 읽는다(useFocusEffect). 이번 주 순위는 이번 주 횟수 순, 그룹 탭은 최근 4주 순위.
 - 찌르기는 지금 문장+링크 공유. 재촉 카드 이미지는 STAGE 5. 앱(native)의 사진·로그인은 2단계.

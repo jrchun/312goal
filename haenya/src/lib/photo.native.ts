@@ -3,6 +3,7 @@ export type PreparedPhoto = {
   blob: Blob;
   previewUrl: string;
   takenAt: Date | null;
+  takenAtSource: 'exif' | 'capture' | null;
   width: number;
   height: number;
 };
@@ -11,6 +12,6 @@ export async function pickPhoto(_mode: 'camera' | 'album'): Promise<File | null>
   throw new Error('앱 사진 올리기는 2단계에서 지원');
 }
 
-export async function preparePhoto(_file: File): Promise<PreparedPhoto> {
+export async function preparePhoto(_file: File, _mode: 'camera' | 'album' = 'album'): Promise<PreparedPhoto> {
   throw new Error('앱 사진 올리기는 2단계에서 지원');
 }
