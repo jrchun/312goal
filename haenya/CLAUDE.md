@@ -53,6 +53,10 @@
 - 카카오(예전 방식, 보조): `signInWithKakao`(`src/lib/auth.web.ts`) → `/auth/kakao` → `functions/api/kakao-token.ts` → `signInWithIdToken`. 되찾기 화면에서 카카오 계정만 "카카오로 이어가기"로 쓴다.
 `/api/*`는 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 가입·되찾기를 끝까지 테스트할 수 없다(배포 주소에서 테스트).
 프로필 미완성(약관·성이름·4자리, 임시 숫자) → `/login`, 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
+**주의(실제 서버 전체 점검에서 찾은 문제):**
+- 스택 아래 깔린 화면도 로그인 상태가 바뀌면 다시 그려진다 → `<Redirect>`는 반드시 `useScreenFocused()`가 true일 때만(`src/lib/useScreenFocused.ts`). 안 그러면 가입 순간 첫 화면이 /login으로 보내 버린다.
+- `SessionProvider`는 겹친 읽기 중 **마지막 요청만** 반영한다(가입 직후의 느린 "미완성" 읽기가 늦게 도착해 덮어쓰던 문제).
+- 전체 점검 스크립트(실서버, 아이폰 화면 흉내): 가입→그룹 만들기→0번째 인증→인증샷→스토리 카드→초대 합류→반응→되찾기(틀림/맞음)→그룹장 초기화→임시 숫자→새 숫자→탈퇴. 테스트 계정은 성 '테'로 만들고 끝나면 `delete_user_account`로 지운다.
 로그인 상태·프로필·내 그룹은 `useSession()`으로 읽는다. 탭 화면은 로그인+약관+그룹이 없으면 들어올 수 없다.
 
 ## 디자인 규칙 (가이드라인 요약)
