@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { isServer, supabase } from './supabase';
 import type { Membership, PinStatus, Profile } from './types';
 
@@ -46,8 +46,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [pin, setPin] = useState<PinStatus | null>(null);
 
+  // 여러 번 겹쳐 읽을 때 마지막 요청만 반영한다.
+  // (가입 직후 시작된 느린 읽기가, 이름·숫자 저장 뒤의 새 읽기보다 늦게 도착해 "미완성"으로 덮어쓰던 문제)
+  const latest = useRef(0);
   const apply = useCallback(async (s: Session | null): Promise<UserState> => {
+    const id = ++latest.current;
     const d = s ? await loadUserData(s.user.id) : { profile: null, membership: null, pin: null };
+    if (id !== latest.current) return { session: s, ...d };
     setSession(s);
     setProfile(d.profile);
     setMembership(d.membership);

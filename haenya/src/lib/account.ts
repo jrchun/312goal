@@ -35,5 +35,6 @@ export async function deleteMyAccount(groupId: string | null, userId: string) {
   if (groupId) await removeMyPhotos(groupId, userId);
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error(error.message);
-  await supabase.auth.signOut();
+  // 계정이 이미 지워졌으니 서버 로그아웃은 403이 난다 → 이 브라우저의 로그인 정보만 지운다
+  await supabase.auth.signOut({ scope: 'local' });
 }
