@@ -69,6 +69,21 @@ create table if not exists public.transfer_tokens (
   used_at    timestamptz
 );
 
+-- 지난 시즌 결과 (예: 기존 312goal 사이트의 2026 "150 Challenge" 기록). 날짜별 기록 없이 시즌 합계만.
+-- group_id·user_id는 나중에 이어 붙인다(비어 있으면 아무도 못 봄).
+create table if not exists public.season_results (
+  id           serial primary key,
+  year         int  not null,
+  display_name text not null,
+  count        int  not null check (count >= 0),
+  goal         int  not null check (goal > 0),
+  source       text not null,               -- 예: '312goal'
+  group_id     uuid,
+  user_id      uuid,
+  imported_at  timestamptz not null default now(),
+  unique (year, source, display_name)
+);
+
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
   name        text not null check (char_length(name) between 1 and 20),
@@ -79,6 +94,10 @@ create table if not exists public.groups (
   owner_id    uuid not null references public.profiles (id),
   created_at  timestamptz not null default now()
 );
+
+do $$ begin
+  alter table public.season_results add constraint season_results_group_fk foreign key (group_id) references public.groups (id) on delete set null;
+exception when duplicate_object then null; end $$;
 
 create table if not exists public.group_members (
   group_id    uuid not null references public.groups (id) on delete cascade,
@@ -236,6 +255,7 @@ alter table public.nudges        enable row level security;
 alter table public.push_tokens   enable row level security;
 alter table public.user_pins     enable row level security;  -- 정책 없음 = 앱에서 직접 접근 불가
 alter table public.transfer_tokens enable row level security; -- 정책 없음 = 함수로만
+alter table public.season_results  enable row level security;
 
 -- 수정 가능한 컬럼을 좁힌다 (예: 본인 role, 그룹 invite_code는 못 바꿈)
 revoke insert, update, delete on public.profiles, public.groups, public.group_members,
@@ -243,6 +263,7 @@ revoke insert, update, delete on public.profiles, public.groups, public.group_me
   from anon, authenticated;
 revoke all on public.user_pins from anon, authenticated;
 revoke all on public.transfer_tokens from anon, authenticated;
+revoke insert, update, delete on public.season_results from anon, authenticated;
 grant insert (id, nickname, avatar_url, terms_agreed_at, family_name, given_name) on public.profiles to authenticated;
 grant update (nickname, avatar_url, terms_agreed_at, family_name, given_name)     on public.profiles to authenticated;
 grant update (name, weekly_goal, season_goal)            on public.groups to authenticated;
@@ -311,6 +332,11 @@ create policy reactions_delete on public.reactions for delete to authenticated
 drop policy if exists nudges_select on public.nudges;
 create policy nudges_select on public.nudges for select to authenticated
   using (public.is_group_member(group_id));
+
+-- season_results: 이어 붙인 그룹의 멤버만 조회
+drop policy if exists season_results_select on public.season_results;
+create policy season_results_select on public.season_results for select to authenticated
+  using (group_id is not null and public.is_group_member(group_id));
 
 -- push_tokens: 본인 것만
 drop policy if exists push_tokens_own on public.push_tokens;

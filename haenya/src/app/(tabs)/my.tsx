@@ -2,7 +2,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
-import { useCanInstall } from '../../components/InstallHint';
 import { Label } from '../../components/Form';
 import { PhotoGrid } from '../../components/PhotoGrid';
 import { PhotoViewer, ViewerPhoto } from '../../components/PhotoViewer';
@@ -25,7 +24,6 @@ export default function My() {
   const [photos, setPhotos] = useState<CheckinRow[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
-  const canInstall = useCanInstall();
 
   const load = useCallback(async () => {
     if (!group || !session) return;
@@ -91,7 +89,6 @@ export default function My() {
           {profile?.nickname} · {group?.name}
         </Text>
         <View style={styles.links}>
-          {canInstall ? <Button variant="text" label="홈 화면에 넣기" onPress={() => router.push('/onboarding?step=install' as never)} /> : null}
           <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
         </View>
       </View>

@@ -8,6 +8,8 @@ import type { PropsWithChildren } from 'react';
  *
  * 주의(Expo SDK 58): headNodes·bodyNodes 를 꼭 넣어야 한다. 빠지면 JS·스타일이 HTML에 안 들어가 화면이 깨진다.
  */
+const FONTS = 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;600;800&display=swap';
+
 export default function Root({ children }: PropsWithChildren) {
   const { htmlAttributes, headNodes, bodyAttributes, bodyNodes } = useServerDocumentContext();
   return (
@@ -33,12 +35,21 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        {/* DB 서버에 미리 연결해 두면 초대 화면의 그룹 정보가 빨리 뜬다 */}
+        <link rel="preconnect" href="https://hfnwadutbowgxrosnypz.supabase.co" crossOrigin="" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;600;800&display=swap"
+        {/* 글꼴 CSS가 첫 화면을 막지 않게: print로 받아 두었다가 다 받으면 all로 바꾼다 */}
+        <link id="hf" rel="stylesheet" href={FONTS} media="print" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var l=document.getElementById('hf');function on(){l.media='all'}if(l.sheet){on()}else{l.addEventListener('load',on)}})();",
+          }}
         />
+        <noscript>
+          <link rel="stylesheet" href={FONTS} />
+        </noscript>
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: 'html,body{background-color:#F1EDE4;}' }} />
         {headNodes}

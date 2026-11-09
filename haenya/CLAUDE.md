@@ -148,15 +148,21 @@
 - **주의:** Supabase는 새 함수에 authenticated 실행 권한을 자동으로 준다 → 내부용 함수는 schema.sql 끝의 revoke 목록에 꼭 추가.
 - 카카오 연결 해제 웹훅: `functions/api/kakao-unlink.ts`. Cloudflare Secret `KAKAO_ADMIN_KEY`, `SUPABASE_SERVICE_ROLE_KEY` + 카카오 콘솔 웹훅 URL `https://haenya.pages.dev/api/kakao-unlink` 이 있어야 동작(없으면 503).
 
-## 온보딩·홈 화면 추가·결산·미리보기 (STAGE 7)
+## 온보딩·결산·미리보기 (STAGE 7)
 
-- 합류 직후(`/joined` → `/onboarding`), 그룹 만든 직후(만들었다 → 다음): ① 0번째 인증 — `public/sample-checkin.jpg`로 스티커 카드 체험, DB 기록 없음 ② 홈 화면 추가 안내.
-- `InstallGuide`(`src/components/InstallGuide.tsx`) + `src/lib/env.web.ts`(어디서 열렸나): 카톡 안 → `kakaotalk://web/openExternal`로 Safari/크롬 열기, 아이폰 Safari → 공유 → 홈 화면에 추가, 안드로이드 크롬 → 설치 창.
-- **1회용 이어가기 열쇠**: `create_transfer_token`(로그인된 곳, 기본 10분·최대 30분) → `/continue?t=`(바로 로그인) 또는 `/install?t=&code=`(아이폰 홈 화면 아이콘 첫 실행 때만 로그인, Safari 탭에선 안내만) → `/api/transfer` → `redeem_transfer_token`(한 번만).
-- 홈 화면 앱 설정 파일은 `/api/manifest`(Pages Function). `?start=`로 시작 주소를 바꾼다 → 아이폰은 추가하는 순간의 시작 주소(열쇠 포함)를 쓴다. 안드로이드 크롬은 크롬과 로그인을 같이 써서 열쇠가 필요 없다.
-- 기존 유저용 입구: 홈의 한 줄 안내(`InstallHint`, ✕로 닫으면 그 브라우저에선 안 보임) + 마이 맨 위 "홈 화면에 넣기" + 설정. 홈 화면 앱으로 열었거나 컴퓨터면 숨김.
+- 합류 직후(`/joined` → `/onboarding`), 그룹 만든 직후(만들었다 → 다음): 0번째 인증 — `public/sample-checkin.jpg`로 스티커 카드 체험, DB 기록 없음.
+- **홈 화면 추가 안내는 넣지 않는다**(사용자 결정 2026-11-10: 앱 단계에서 다룬다. 아이폰은 웹이 버튼으로 홈 화면에 추가할 방법이 없음). 안내 화면·이어가기 링크 화면은 지웠다.
+  DB의 `create_transfer_token`/`redeem_transfer_token`(1회용 이어가기 열쇠)은 앱 단계에서 쓸 수 있게 남겨둠(지금 앱에서 안 씀).
+- 웹 앱 설정 파일 `/api/manifest`(이름·아이콘·색, 시작 주소 /home)와 애플 웹앱 메타 태그는 그대로(브라우저 메뉴로 직접 추가하는 사람용).
 - 월요일 홈 맨 위: 지난주 결산(`group_week_summary`) + 주간 결산 스토리 카드(`makeWeeklyCard`, 검정 바탕, 그룹 합계만).
 - 링크 미리보기: `+html.tsx`의 og 태그 + `public/og.png`(1200×630). 카톡은 미리보기를 캐시하니 바꾸면 카카오 "공유 디버거"로 캐시를 지워야 한다.
+
+## 배포 마무리 (STAGE 8)
+
+- 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). **오픈 전 운영자 연락처(`OPERATOR_CONTACT`) 채우기 + 전문가 검토.**
+- DB 휴면 방지: `.github/workflows/haenya-keepalive.yml`(매일 06:17 KST, 공개 키로 읽기 1회). GitHub 예약 실행은 **main에 이 파일이 있어야** 돈다.
+- 312goal 2026 기록 이관: `bash scripts/import-312goal.sh 2026` → `season_results`(시즌 합계만, 재실행하면 최신 숫자로 덮어씀). 옛 프로젝트는 공개 키로 읽기만. 실제 인원은 5명(천·호·고·혁·밤). **12월 31일 이후 한 번 더 실행.** group_id·user_id는 아직 비어 있음(비어 있으면 아무도 못 봄).
+- 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
 
 ## DB (Supabase)
 

@@ -1,7 +1,6 @@
 /**
- * Cloudflare Pages Function: GET /api/manifest — 홈 화면 앱(PWA) 설정 파일.
- * ?start=/install?t=... 를 주면 그 주소에서 시작한다 → 아이폰 홈 화면 아이콘이 처음 열릴 때
- * 1회용 이어가기 열쇠로 숫자 없이 로그인된다. 기본 시작 주소는 /home.
+ * Cloudflare Pages Function: GET /api/manifest — 웹 앱 설정 파일(이름·아이콘·색).
+ * 홈 화면 추가 안내 기능은 앱 단계로 미뤘다(사용자 결정 2026-11-10). 브라우저 메뉴로 직접 추가하면 /home에서 시작.
  */
 export async function onRequestGet({ request }: { request: Request }): Promise<Response> {
   const start = new URL(request.url).searchParams.get('start') ?? '/home';
