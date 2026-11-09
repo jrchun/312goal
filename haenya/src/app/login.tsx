@@ -68,12 +68,19 @@ function Consent({ next }: { next?: string }) {
     setBusy(true);
     setError('');
     const meta = s.session.user.user_metadata ?? {};
-    const { error: e } = await supabase.from('profiles').upsert({
-      id: s.session.user.id,
+    const uid = s.session.user.id;
+    const fields = {
       nickname: name,
-      avatar_url: s.profile?.avatar_url ?? meta.avatar_url ?? meta.picture ?? null,
+      avatar_url: s.profile?.avatar_url ?? meta.picture ?? meta.avatar_url ?? null,
       terms_agreed_at: new Date().toISOString(),
-    });
+    };
+    // 프로필은 보통 첫 로그인 때 DB 트리거가 만들어 둔다 → 수정. 없을 때만 새로 만든다.
+    // (upsert는 id 칸까지 수정하려 해서 권한 오류가 난다)
+    const updated = await supabase.from('profiles').update(fields).eq('id', uid).select('id');
+    let e = updated.error;
+    if (!e && (updated.data?.length ?? 0) === 0) {
+      e = (await supabase.from('profiles').insert({ id: uid, ...fields })).error;
+    }
     if (e) {
       setBusy(false);
       setError('저장이 안 됐다. 다시 해봐.');
