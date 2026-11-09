@@ -126,6 +126,28 @@ create table if not exists public.push_tokens (
   primary key (user_id, token)
 );
 
+-- 첫 로그인 때 profiles 행을 자동으로 만든다 (카카오 닉네임·프로필 사진).
+-- 약관 동의 전이라 terms_agreed_at 은 비워둔다 → 앱이 동의 화면을 보여준다.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, nickname, avatar_url)
+  values (
+    new.id,
+    left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
+                  nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+                  nullif(trim(new.raw_user_meta_data ->> 'preferred_username'), ''),
+                  '친구'), 20),
+    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')
+  )
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 -- ---------------------------------------------------------------------
 -- 3. 권한 도우미 (RLS 안에서 쓰므로 security definer)
 -- ---------------------------------------------------------------------
@@ -300,11 +322,14 @@ begin
 end $$;
 
 -- 초대 랜딩용 미리보기: 로그인 전에도 볼 수 있음 (그룹명·인원·이번 주 합계만)
+-- (돌려주는 칸이 바뀌어서 지우고 다시 만든다)
+drop function if exists public.get_invite_preview(text);
 create or replace function public.get_invite_preview(p_code text)
-returns table (group_name text, member_count int, weekly_goal int,
+returns table (group_name text, owner_nickname text, member_count int, weekly_goal int,
                week_total int, week_target int, season_year int, is_full boolean)
 language sql stable security definer set search_path = public as $$
   select g.name,
+         (select p.nickname from public.profiles p where p.id = g.owner_id),
          m.cnt,
          g.weekly_goal,
          (select count(*)::int from public.checkins c

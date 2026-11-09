@@ -4,6 +4,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import { SessionProvider } from '../lib/session';
 import { color } from '../theme';
 
 export default function RootLayout() {
@@ -18,12 +19,12 @@ export default function RootLayout() {
   if (!loaded && Platform.OS !== 'web') return null;
 
   return (
-    <>
+    <SessionProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.cream } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="checkin" options={{ presentation: 'modal' }} />
       </Stack>
-    </>
+    </SessionProvider>
   );
 }

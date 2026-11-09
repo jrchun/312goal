@@ -28,6 +28,9 @@
 | `/` 일반 랜딩 | `src/app/index.tsx` | STAGE 7 |
 | `/join/[code]` 초대 랜딩 | `src/app/join/[code].tsx` | STAGE 3 |
 | `/login` 카카오 로그인 + 약관 | `src/app/login.tsx` | STAGE 3 |
+| `/auth/callback` 카카오 로그인 후 돌아오는 곳 | `src/app/auth/callback.tsx` | STAGE 3 |
+| `/joined` 그룹 합류 확인 + 내 올해 목표 | `src/app/joined.tsx` | STAGE 3 |
+| `/terms` `/privacy` 약관 (초안은 STAGE 8) | `src/app/terms.tsx`, `privacy.tsx` | STAGE 3·8 |
 | `/create-group` | `src/app/create-group.tsx` | STAGE 3 |
 | `/onboarding` 0번째 인증, 홈 화면 추가 안내 | `src/app/onboarding.tsx` | STAGE 7 |
 | `/home` `/group` `/my` (탭) | `src/app/(tabs)/` | STAGE 4·6 |
@@ -36,6 +39,10 @@
 | `/settings` | `src/app/settings.tsx` | STAGE 6 |
 
 `public/_redirects`가 `/join/*`을 `/join/[code]`로 돌린다(Cloudflare Pages).
+
+로그인 흐름: 카카오(`src/lib/auth.web.ts` / `auth.native.ts`) → `/auth/callback?next=...` → `nextRoute()`(`src/lib/session.tsx`)가 갈 곳을 정한다.
+약관 미동의 → `/login`(동의 단계), 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
+로그인 상태·프로필·내 그룹은 `useSession()`으로 읽는다. 탭 화면은 로그인+약관+그룹이 없으면 들어올 수 없다.
 
 ## 디자인 규칙 (가이드라인 요약)
 

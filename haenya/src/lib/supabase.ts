@@ -10,14 +10,16 @@ if (!url || !anonKey) {
 }
 
 // 정적 HTML을 만드는 동안(서버)에는 브라우저 저장소가 없으므로 세션을 저장하지 않는다.
-const isServer = Platform.OS === 'web' && typeof window === 'undefined';
+export const isServer = Platform.OS === 'web' && typeof window === 'undefined';
 
 export const supabase = createClient(url || 'http://localhost', anonKey || 'missing', {
   auth: {
     storage: Platform.OS === 'web' ? undefined : AsyncStorage, // 웹은 기본 localStorage
     persistSession: !isServer,
     autoRefreshToken: !isServer,
-    detectSessionInUrl: Platform.OS === 'web',
+    // 카카오 로그인 후 돌아오면 /auth/callback 화면이 직접 code를 세션으로 바꾼다
+    detectSessionInUrl: false,
+    flowType: 'pkce',
   },
 });
 

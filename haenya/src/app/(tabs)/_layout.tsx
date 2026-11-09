@@ -1,8 +1,13 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+import { nextRoute, useSession } from '../../lib/session';
 import { color, font } from '../../theme';
 
-/** 하단 메뉴: 검정 바, 홈 · 그룹 · 마이. 아이콘 없이 글자만, 선택된 탭은 밑줄 대신 크림 글자. */
+/** 하단 메뉴: 검정 바, 홈 · 그룹 · 마이. 아이콘 없이 글자만. 로그인·그룹이 없으면 들어올 수 없다. */
 export default function TabsLayout() {
+  const s = useSession();
+  if (!s.loading && (!s.session || !s.profile?.terms_agreed_at || !s.membership)) {
+    return <Redirect href={nextRoute(s) as never} />;
+  }
   return (
     <Tabs
       screenOptions={{

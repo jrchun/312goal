@@ -3,9 +3,13 @@
 -- 사용자 a..n (14명)
 do $$ declare c char; begin
   foreach c in array string_to_array('a,b,c,d,e,f,g,h,i,j,k,l,m,n', ',') loop
-    insert into auth.users values (md5(c)::uuid);
-    insert into public.profiles (id, nickname) values (md5(c)::uuid, upper(c));
+    -- 프로필은 트리거(handle_new_user)가 카카오 닉네임으로 만든다
+    insert into auth.users (id, raw_user_meta_data) values (md5(c)::uuid, jsonb_build_object('name', upper(c)));
   end loop; end $$;
+insert into auth.users (id) values (md5('noname')::uuid);
+\echo '== 0. 첫 로그인 프로필 자동 생성'
+select count(*) as "프로필 수(15)", (select nickname from profiles where id = md5('noname')::uuid) as "닉네임 없는 사람(친구)",
+       (select count(*) from profiles where terms_agreed_at is null) as "약관 미동의(15)" from profiles;
 create function pg_temp.as_user(c text) returns void language sql as $$
   select set_config('request.jwt.claim.sub', md5(c), false) $$;
 create function pg_temp.uid(c text) returns uuid language sql as $$

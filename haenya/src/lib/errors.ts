@@ -15,7 +15,7 @@ const messages: Record<string, string> = {
   BAD_PHOTO_PATH: '사진을 다시 올려줘.',
 };
 
-export function errorMessage(error: { message?: string } | null | undefined): string {
-  const code = error?.message?.trim() ?? '';
+export function errorMessage(error: unknown): string {
+  const code = (error as { message?: string } | null)?.message?.trim() ?? '';
   return messages[code] ?? '잠깐 문제가 생겼다. 다시 해봐.';
 }
