@@ -106,7 +106,7 @@
 - 화면용 집계: `group_week_board`(이번 주 보드·순위·무소식 일수), `my_stats`, `my_weeks`(52주 칸), `group_week_summary`(주간 결산).
 - 직접 쓰기는 이것만 허용: profiles(본인), groups 이름·목표(그룹장), group_members.season_goal·나가기(본인), checkins 삭제(본인), reactions(본인), push_tokens(본인).
 - 함수 오류 코드(`PHOTO_NOT_TODAY`, `ALREADY_NUDGED`, `GROUP_FULL` 등) → 문구는 `src/lib/errors.ts`. 새 코드를 만들면 둘 다 고친다.
-- 랭킹: `rank_weeks = min(연속 달성 주, 4)` 내림차순, 같으면 시즌 누적. 이번 주는 이미 달성했을 때만 연속에 포함.
+- 랭킹(B안, 사용자 확정): `rank_weeks` = 최근 끝난 4주(4주 전~지난주) 중 주간 목표를 채운 주 수(0~4, 연속 아니어도 됨). 높은 순, 같으면 시즌 누적 많은 순. 이번 주는 진행 중이라 넣지 않는다. (`streak_weeks` 연속 달성 주 수는 마이 화면 참고용으로만 남김)
 - 스키마를 바꾸면 `docs/db-test/run.sh`로 로컬 Postgres에서 검증한다.
 - 환경변수: `.env.example` → `.env.local` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
 

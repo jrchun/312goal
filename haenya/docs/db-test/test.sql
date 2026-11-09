@@ -89,3 +89,20 @@ reset role; set role anon; select set_config('request.jwt.claim.sub', '', false)
 \echo '== 8. 초대 미리보기 (비로그인)'
 select * from get_invite_preview(:'code');
 select pg_temp.try(format('select join_group(%L)', :'code')) as "anon 합류 시도";
+
+\echo '== 9. 랭킹 B안 (최근 4주 중 채운 주 수) — 호·고은·민지·성우 예시'
+reset role;
+delete from checkins where user_id in (pg_temp.uid('c'), pg_temp.uid('d'), pg_temp.uid('e'), pg_temp.uid('f'));
+update profiles set nickname = case id when pg_temp.uid('c') then '호' when pg_temp.uid('d') then '고은'
+  when pg_temp.uid('e') then '민지' when pg_temp.uid('f') then '성우' else nickname end;
+-- 주별 횟수: 4주 전, 3주 전, 2주 전, 지난주, 이번 주
+insert into checkins (group_id,user_id,check_date,photo_path,date_verified,counted)
+select :'gid', pg_temp.uid(u), week_start(haenya_today()) - 7 * (4 - wi) + dd, 'p', true, true
+from (values ('c', array[3,4,3,3,3]), ('d', array[1,3,3,3,1]), ('e', array[0,0,3,3,0]), ('f', array[3,3,3,2,2])) v(u, cnts),
+     generate_series(0, 4) wi, generate_series(0, 6) dd
+where dd < cnts[wi + 1];
+set role authenticated;
+select pg_temp.as_user('a');
+select rank as "순위", nickname as "이름", rank_weeks as "최근4주 채운 주(기대: 호4 성우3 고은3 민지2)",
+       season_count as "시즌 누적", week_count as "이번 주"
+from group_week_board(:'gid') where nickname in ('호','고은','민지','성우');

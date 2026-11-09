@@ -456,7 +456,9 @@ $$;
 
 -- 홈·그룹 화면용 멤버 보드 (이번 주 기준)
 --  streak_weeks: 연속 달성 주 수. 이번 주를 이미 달성했으면 이번 주부터, 아니면 지난주부터 거꾸로 센다.
---  rank_weeks:   랭킹 기준 = min(streak_weeks, 4)  ("최근 4주 연속 달성 주차")
+--  rank_weeks:   랭킹 기준 = 최근 4주(4주 전 ~ 지난주, 끝난 주만) 중 주간 목표를 채운 주 수 (0~4).
+--                연속이 아니어도 된다. 이번 주는 진행 중이라 넣지 않는다. 같으면 시즌 누적이 많은 쪽이 위.
+--                (사용자 결정 2026-11-09: "연속 달성" 대신 이 방식, B안)
 --  days_silent:  마지막 인정 인증 이후 지난 날 수 (인증이 없으면 가입일부터). 3 이상이면 찌르기 대상
 create or replace function public.group_week_board(p_group_id uuid)
 returns table (user_id uuid, nickname text, avatar_url text, is_me boolean,
@@ -480,6 +482,12 @@ language sql stable as $$
     where s.still
     group by s.user_id
   ),
+  recent4 as (
+    select w.user_id, count(*) filter (where w.achieved)::int as recent4_weeks
+    from weeks w, today
+    where w.week >= public.week_start(today.d) - 28 and w.week < public.week_start(today.d)
+    group by w.user_id
+  ),
   base as (
     select m.user_id, p.nickname, p.avatar_url, m.user_id = auth.uid() as is_me,
            coalesce((select w.cnt from weeks w, today
@@ -492,19 +500,21 @@ language sql stable as $$
            (select max(c.check_date) from public.checkins c
              where c.group_id = m.group_id and c.user_id = m.user_id and c.counted) as last_check_date,
            public.to_check_date(m.joined_at) as joined_date,
-           coalesce(s.streak_weeks, 0) as streak_weeks
+           coalesce(s.streak_weeks, 0) as streak_weeks,
+           coalesce(r.recent4_weeks, 0) as recent4_weeks
     from public.group_members m
     join public.groups g on g.id = m.group_id
     join public.profiles p on p.id = m.user_id
     left join streak s on s.user_id = m.user_id
+    left join recent4 r on r.user_id = m.user_id
     where m.group_id = p_group_id
   )
   select b.user_id, b.nickname, b.avatar_url, b.is_me, b.week_count, b.weekly_goal,
          b.season_count, b.season_goal, b.last_check_date,
          ((select d from today) - coalesce(b.last_check_date, b.joined_date))::int as days_silent,
          b.streak_weeks,
-         least(b.streak_weeks, 4) as rank_weeks,
-         rank() over (order by least(b.streak_weeks, 4) desc, b.season_count desc)::int as rank
+         b.recent4_weeks as rank_weeks,
+         rank() over (order by b.recent4_weeks desc, b.season_count desc)::int as rank
   from base b
   order by rank, b.nickname
 $$;
