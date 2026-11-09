@@ -1,4 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
+import { useCache } from '../../lib/cache';
+import { boardKey, loadBoard, loadGroupTab, loadMyTab } from '../../lib/tabData';
 import { useCallback, useState } from 'react';
 import { Platform, Share, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
@@ -22,8 +24,7 @@ import { color, space, type } from '../../theme';
 
 /** 홈 — "오늘 했냐?"에 답하는 화면. 이번 주 n/목표 + 인증 버튼 + 이번 주 순위 + 무소식 찌르기 */
 export default function Home() {
-  const { membership } = useSession();
-  const [rows, setRows] = useState<BoardRow[] | null>(null);
+  const { membership, session } = useSession();
   const [poked, setPoked] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<{ text: string; tone: 'info' | 'error' } | null>(null);
   const group = membership?.group;
@@ -31,20 +32,27 @@ export default function Home() {
   const [sheet, setSheet] = useState<string | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
 
+  const rows = useCache<BoardRow[]>(group ? boardKey(group.id) : null) ?? null;
+
   const load = useCallback(async () => {
     if (!group) return;
-    const { data, error } = await supabase.rpc('group_week_board', { p_group_id: group.id });
-    if (error) {
-      setNotice({ text: errorMessage(error), tone: 'error' });
+    try {
+      await loadBoard(group.id);
+    } catch (e) {
+      setNotice({ text: errorMessage(e), tone: 'error' });
       return;
     }
-    setRows((data as BoardRow[]) ?? []);
+    // 그룹·마이 탭을 미리: 화면 코드와 데이터를 뒤에서 받아 둔다 → 탭을 누르면 바로 뜬다
+    router.prefetch('/group');
+    router.prefetch('/my');
+    loadGroupTab(group.id).catch(() => undefined);
+    if (session) loadMyTab(group.id, session.user.id).catch(() => undefined);
     // 월요일에는 지난주 결산
     if (new Date(`${checkDate()}T00:00:00Z`).getUTCDay() === 1) {
       const sm = await supabase.rpc('group_week_summary', { p_group_id: group.id }).maybeSingle();
       setSummary((sm.data as WeekSummary | null) ?? null);
     } else setSummary(null);
-  }, [group]);
+  }, [group, session]);
 
   // 인증하고 돌아올 때마다 다시 읽는다
   useFocusEffect(

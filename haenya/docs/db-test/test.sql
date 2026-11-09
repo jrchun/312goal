@@ -204,3 +204,10 @@ select create_transfer_token() as tok2 \gset
 reset role; update transfer_tokens set expires_at = now() - interval '1 second' where token_hash = encode(digest(:'tok2','sha256'),'hex');
 set role anon;
 select status as "만료된 열쇠(INVALID)" from redeem_transfer_token(:'tok2');
+
+\echo '== 18. 탭 묶음 함수'
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select jsonb_array_length(t->'board') as board_rows, jsonb_typeof(t->'checkins') as checkins, jsonb_typeof(t->'reactions') as reactions from group_tab(:'dgid') t;
+select (t->'stats'->>'season_goal') is not null as has_stats, jsonb_array_length(t->'weeks') > 0 as has_weeks, jsonb_typeof(t->'photos') as photos from my_tab(:'dgid') t;
+select set_config('request.jwt.claim.sub', md5('m'), false);
+select jsonb_array_length(t->'board') as "다른 그룹 사람: 보드 0행" , jsonb_array_length(t->'checkins') as "인증 0" from group_tab(:'dgid') t;

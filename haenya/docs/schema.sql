@@ -655,6 +655,35 @@ language sql stable as $$
   from w
 $$;
 
+-- 탭 한 번에 필요한 데이터를 한 번의 요청으로 (요청을 줄여 탭 이동을 빠르게). security invoker → RLS 그대로
+create or replace function public.group_tab(p_group_id uuid)
+returns jsonb language sql stable as $$
+  with wk as (select public.week_start(public.haenya_today()) as d),
+  cs as (
+    select c.id, c.user_id, c.check_date, c.photo_path, c.date_verified, c.counted, c.created_at
+    from public.checkins c, wk
+    where c.group_id = p_group_id and c.check_date >= wk.d
+  )
+  select jsonb_build_object(
+    'board', coalesce((select jsonb_agg(to_jsonb(b)) from public.group_week_board(p_group_id) b), '[]'::jsonb),
+    'checkins', coalesce((select jsonb_agg(to_jsonb(cs) order by cs.created_at desc) from cs), '[]'::jsonb),
+    'reactions', coalesce((select jsonb_agg(jsonb_build_object('checkin_id', r.checkin_id, 'user_id', r.user_id, 'emoji', r.emoji))
+                           from public.reactions r join cs on cs.id = r.checkin_id), '[]'::jsonb)
+  )
+$$;
+
+create or replace function public.my_tab(p_group_id uuid)
+returns jsonb language sql stable as $$
+  select jsonb_build_object(
+    'stats', (select to_jsonb(s) from public.my_stats(p_group_id) s limit 1),
+    'weeks', coalesce((select jsonb_agg(to_jsonb(w) order by w.week) from public.my_weeks(p_group_id) w), '[]'::jsonb),
+    'photos', coalesce((select jsonb_agg(to_jsonb(c) order by c.created_at desc) from (
+        select id, user_id, check_date, photo_path, date_verified, counted, created_at
+        from public.checkins where group_id = p_group_id and user_id = auth.uid()
+        order by created_at desc limit 40) c), '[]'::jsonb)
+  )
+$$;
+
 -- ---------------------------------------------------------------------
 -- 9-1. 인증 삭제 · 그룹 나가기 · 회원 탈퇴 (STAGE 6)
 -- ---------------------------------------------------------------------
@@ -896,6 +925,8 @@ grant execute on function
   public.my_stats(uuid),
   public.my_weeks(uuid, int),
   public.group_week_summary(uuid, date),
+  public.group_tab(uuid),
+  public.my_tab(uuid),
   public.is_group_member(uuid),
   public.shares_group(uuid),
   public.path_group_id(text),

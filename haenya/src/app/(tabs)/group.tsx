@@ -9,13 +9,14 @@ import { RankRow } from '../../components/RankRow';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { TopBar } from '../../components/TopBar';
-import { checkDate, weekStart } from '../../lib/dates';
+import { checkDate } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
 import { copyOrShareInvite } from '../../lib/invite';
-import { signedUrls } from '../../lib/photos';
+import { getCache, setCache, useCache } from '../../lib/cache';
+import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
-import type { BoardRow, CheckinRow, ReactionKey, ReactionRow } from '../../lib/types';
+import type { ReactionKey } from '../../lib/types';
 import { color, space, type } from '../../theme';
 
 /** 그룹 — 최근 4주 달성 순위 + 이번 주 인증샷 모음(반응) + 초대 링크 */
@@ -23,37 +24,23 @@ export default function Group() {
   const { membership, session } = useSession();
   const group = membership?.group;
   const me = session?.user.id;
-  const [board, setBoard] = useState<BoardRow[]>([]);
-  const [photos, setPhotos] = useState<CheckinRow[]>([]);
-  const [urls, setUrls] = useState<Record<string, string>>({});
-  const [reactions, setReactions] = useState<ReactionRow[]>([]);
+  const key = group ? groupKey(group.id) : null;
+  const data = useCache<GroupTab>(key);
+  const board = data?.board ?? [];
+  const photos = data?.checkins ?? [];
+  const urls = data?.urls ?? {};
+  const reactions = data?.reactions ?? [];
   const [open, setOpen] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
 
+  // 저장된 게 있으면 바로 보여주고, 탭에 올 때마다 뒤에서 새로 받는다 (요청 1번)
   const load = useCallback(async () => {
     if (!group) return;
-    const from = weekStart(checkDate());
-    const [b, c] = await Promise.all([
-      supabase.rpc('group_week_board', { p_group_id: group.id }),
-      supabase
-        .from('checkins')
-        .select('id, user_id, check_date, photo_path, date_verified, counted, created_at')
-        .eq('group_id', group.id)
-        .gte('check_date', from)
-        .order('created_at', { ascending: false }),
-    ]);
-    if (b.error || c.error) {
-      setNotice(errorMessage(b.error ?? c.error));
-      return;
+    try {
+      await loadGroupTab(group.id);
+    } catch (e) {
+      setNotice(errorMessage(e));
     }
-    const rows = (c.data as CheckinRow[]) ?? [];
-    setBoard((b.data as BoardRow[]) ?? []);
-    setPhotos(rows);
-    setUrls(await signedUrls(rows.map((r) => r.photo_path)));
-    if (rows.length) {
-      const r = await supabase.from('reactions').select('checkin_id, user_id, emoji').in('checkin_id', rows.map((x) => x.id));
-      setReactions((r.data as ReactionRow[]) ?? []);
-    } else setReactions([]);
   }, [group]);
 
   useFocusEffect(
@@ -85,18 +72,22 @@ export default function Group() {
     };
   }, [open, photos, reactions, urls, names, me]);
 
-  const react = async (key: ReactionKey) => {
-    if (!viewer || !me) return;
-    const on = !!viewer.mine[key];
-    // 화면 먼저 바꾸고 서버에 반영
-    setReactions((rs) =>
-      on
-        ? rs.filter((r) => !(r.checkin_id === viewer.id && r.user_id === me && r.emoji === key))
-        : [...rs, { checkin_id: viewer.id, user_id: me, emoji: key }],
-    );
+  const react = async (emoji: ReactionKey) => {
+    if (!viewer || !me || !key) return;
+    const on = !!viewer.mine[emoji];
+    const cur = getCache<GroupTab>(key);
+    if (cur) {
+      // 화면 먼저 바꾸고 서버에 반영
+      setCache<GroupTab>(key, {
+        ...cur,
+        reactions: on
+          ? cur.reactions.filter((r) => !(r.checkin_id === viewer.id && r.user_id === me && r.emoji === emoji))
+          : [...cur.reactions, { checkin_id: viewer.id, user_id: me, emoji }],
+      });
+    }
     const res = on
-      ? await supabase.from('reactions').delete().match({ checkin_id: viewer.id, user_id: me, emoji: key })
-      : await supabase.from('reactions').insert({ checkin_id: viewer.id, user_id: me, emoji: key });
+      ? await supabase.from('reactions').delete().match({ checkin_id: viewer.id, user_id: me, emoji })
+      : await supabase.from('reactions').insert({ checkin_id: viewer.id, user_id: me, emoji });
     if (res.error) load();
   };
 
@@ -113,6 +104,9 @@ export default function Group() {
       <Text style={styles.title} numberOfLines={2} adjustsFontSizeToFit>{group?.name ?? ''}</Text>
       <Rule />
 
+      {!data ? <Text style={[type.caption, styles.loading]}>불러오는 중.</Text> : null}
+      {data ? (
+      <>
       <View style={styles.section}>
         <Label>최근 4주 달성 순위</Label>
         <View style={styles.list}>
@@ -154,6 +148,9 @@ export default function Group() {
         )}
       </View>
 
+      </>
+      ) : null}
+
       <View style={styles.actions}>
         <Notice>{notice}</Notice>
         <Button variant="secondary" label="친구 더 끌어들이기" onPress={invite} />
@@ -169,4 +166,5 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   list: { paddingTop: space(1) },
   actions: { gap: space(3), paddingVertical: space(6) },
+  loading: { paddingTop: space(5) },
 });

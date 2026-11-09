@@ -1,5 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { clearCache } from './cache';
+import { clearSignedUrls } from './photos';
 import { isServer, supabase } from './supabase';
 import type { Membership, PinStatus, Profile } from './types';
 
@@ -53,6 +55,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const id = ++latest.current;
     const d = s ? await loadUserData(s.user.id) : { profile: null, membership: null, pin: null };
     if (id !== latest.current) return { session: s, ...d };
+    if (!s) {
+      clearCache();
+      clearSignedUrls();
+    }
     setSession(s);
     setProfile(d.profile);
     setMembership(d.membership);

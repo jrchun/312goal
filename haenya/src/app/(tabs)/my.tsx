@@ -9,40 +9,27 @@ import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { deleteCheckin } from '../../lib/account';
 import { checkDate, weekStart } from '../../lib/dates';
-import { signedUrls } from '../../lib/photos';
+import { useCache } from '../../lib/cache';
+import { loadMyTab, MyTab, myKey } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
-import { supabase } from '../../lib/supabase';
-import type { CheckinRow, MyStats, MyWeek } from '../../lib/types';
 import { color, font, line, space, type } from '../../theme';
 
 /** 마이 — 시즌 누적을 가장 크게, 연말 예측으로 압박. 52주 칸, 찌른·찔린 횟수, 내 인증샷 */
 export default function My() {
   const { membership, profile, session } = useSession();
   const group = membership?.group;
-  const [stats, setStats] = useState<MyStats | null>(null);
-  const [weeks, setWeeks] = useState<MyWeek[]>([]);
-  const [photos, setPhotos] = useState<CheckinRow[]>([]);
-  const [urls, setUrls] = useState<Record<string, string>>({});
+  const key = group && session ? myKey(group.id, session.user.id) : null;
+  const data = useCache<MyTab>(key);
+  const stats = data?.stats ?? null;
+  const weeks = data?.weeks ?? [];
+  const photos = data?.photos ?? [];
+  const urls = data?.urls ?? {};
   const [open, setOpen] = useState<string | null>(null);
 
+  // 저장된 게 있으면 바로 보여주고, 탭에 올 때마다 뒤에서 새로 받는다 (요청 1번)
   const load = useCallback(async () => {
     if (!group || !session) return;
-    const [s, w, c] = await Promise.all([
-      supabase.rpc('my_stats', { p_group_id: group.id }).maybeSingle(),
-      supabase.rpc('my_weeks', { p_group_id: group.id }),
-      supabase
-        .from('checkins')
-        .select('id, user_id, check_date, photo_path, date_verified, counted, created_at')
-        .eq('group_id', group.id)
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(40),
-    ]);
-    setStats((s.data as MyStats | null) ?? null);
-    setWeeks((w.data as MyWeek[]) ?? []);
-    const rows = (c.data as CheckinRow[]) ?? [];
-    setPhotos(rows);
-    setUrls(await signedUrls(rows.map((r) => r.photo_path)));
+    await loadMyTab(group.id, session.user.id).catch(() => undefined);
   }, [group, session]);
 
   useFocusEffect(
@@ -92,6 +79,9 @@ export default function My() {
           <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
         </View>
       </View>
+      {!data ? <Text style={[type.caption, styles.loading]}>불러오는 중.</Text> : null}
+      {data ? (
+      <>
       <Label>{stats?.season_year ?? checkDate().slice(0, 4)} 시즌 누적</Label>
       <Text style={[type.progress, styles.big]}>
         {count}
@@ -143,6 +133,8 @@ export default function My() {
           <Text style={[type.sentence, { color: color.black }]}>아직 한 장도 없다.</Text>
         )}
       </View>
+      </>
+      ) : null}
       <PhotoViewer
         photo={viewer}
         onClose={() => setOpen(null)}
@@ -178,4 +170,5 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space(5) },
   stat: { gap: 2 },
   section: { gap: space(1), paddingTop: space(5), paddingBottom: space(6) },
+  loading: { paddingTop: space(5) },
 });
