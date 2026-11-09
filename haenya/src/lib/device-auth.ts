@@ -33,3 +33,17 @@ export async function restoreWithPin(userId: string, pin: string): Promise<void>
   const { error } = await supabase.auth.signInWithPassword({ email: cred.email, password: cred.password });
   if (error) throw new Error('RESTORE_FAILED');
 }
+
+/** 1회용 이어가기 열쇠 만들기 (로그인된 곳에서). 기본 10분 */
+export async function createTransferToken(minutes = 10): Promise<string> {
+  const { data, error } = await supabase.rpc('create_transfer_token', { p_minutes: minutes });
+  if (error || !data) throw new Error(error?.message ?? 'TOKEN_FAILED');
+  return data as string;
+}
+
+/** 이어가기 열쇠로 로그인 (Safari·홈 화면 아이콘에서) */
+export async function signInWithTransferToken(token: string): Promise<void> {
+  const cred = await post<{ email: string; password: string }>('/api/transfer', { token });
+  const { error } = await supabase.auth.signInWithPassword({ email: cred.email, password: cred.password });
+  if (error) throw new Error('RESTORE_FAILED');
+}

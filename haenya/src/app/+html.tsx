@@ -18,6 +18,20 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
         <meta name="theme-color" content="#F1EDE4" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/api/manifest" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="했냐" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="description" content="친구끼리 운동 인증. 사진 한 장이면 끝. 안 하면 단톡방에서 찔린다." />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="했냐" />
+        <meta property="og:title" content="너도 했냐?" />
+        <meta property="og:description" content="친구끼리 운동 인증. 사진 한 장이면 끝. 안 하면 단톡방에서 찔린다." />
+        <meta property="og:image" content="https://haenya.pages.dev/og.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />

@@ -148,6 +148,15 @@
 - **주의:** Supabase는 새 함수에 authenticated 실행 권한을 자동으로 준다 → 내부용 함수는 schema.sql 끝의 revoke 목록에 꼭 추가.
 - 카카오 연결 해제 웹훅: `functions/api/kakao-unlink.ts`. Cloudflare Secret `KAKAO_ADMIN_KEY`, `SUPABASE_SERVICE_ROLE_KEY` + 카카오 콘솔 웹훅 URL `https://haenya.pages.dev/api/kakao-unlink` 이 있어야 동작(없으면 503).
 
+## 온보딩·홈 화면 추가·결산·미리보기 (STAGE 7)
+
+- 합류 직후(`/joined` → `/onboarding`), 그룹 만든 직후(만들었다 → 다음): ① 0번째 인증 — `public/sample-checkin.jpg`로 스티커 카드 체험, DB 기록 없음 ② 홈 화면 추가 안내.
+- `InstallGuide`(`src/components/InstallGuide.tsx`) + `src/lib/env.web.ts`(어디서 열렸나): 카톡 안 → `kakaotalk://web/openExternal`로 Safari/크롬 열기, 아이폰 Safari → 공유 → 홈 화면에 추가, 안드로이드 크롬 → 설치 창.
+- **1회용 이어가기 열쇠**: `create_transfer_token`(로그인된 곳, 기본 10분·최대 30분) → `/continue?t=`(바로 로그인) 또는 `/install?t=&code=`(아이폰 홈 화면 아이콘 첫 실행 때만 로그인, Safari 탭에선 안내만) → `/api/transfer` → `redeem_transfer_token`(한 번만).
+- 홈 화면 앱 설정 파일은 `/api/manifest`(Pages Function). `?start=`로 시작 주소를 바꾼다 → 아이폰은 추가하는 순간의 시작 주소(열쇠 포함)를 쓴다. 안드로이드 크롬은 크롬과 로그인을 같이 써서 열쇠가 필요 없다.
+- 월요일 홈 맨 위: 지난주 결산(`group_week_summary`) + 주간 결산 스토리 카드(`makeWeeklyCard`, 검정 바탕, 그룹 합계만).
+- 링크 미리보기: `+html.tsx`의 og 태그 + `public/og.png`(1200×630). 카톡은 미리보기를 캐시하니 바꾸면 카카오 "공유 디버거"로 캐시를 지워야 한다.
+
 ## DB (Supabase)
 
 - 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).

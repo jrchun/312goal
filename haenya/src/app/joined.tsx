@@ -41,7 +41,7 @@ export default function Joined() {
       }
       await s.refresh();
     }
-    router.replace('/home');
+    router.replace('/onboarding');
   };
 
   return (

@@ -188,3 +188,19 @@ reset role; set role authenticated; select set_config('request.jwt.claim.sub', m
 select is_temp as "임시 표시(t)" from my_pin_status();
 select pg_temp.try($$select set_my_pin('2468')$$) as "새 숫자", (select is_temp from my_pin_status()) as "임시 해제(f)";
 select nickname as "보드에는 이름만" from group_week_board(:'dgid') order by 1;
+
+\echo '== 17. 1회용 이어가기 열쇠'
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select create_transfer_token() as tok \gset
+select length(:'tok') as "열쇠 길이(48)";
+select pg_temp.try('select * from transfer_tokens') as "열쇠 표 직접 읽기";
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select * from redeem_transfer_token(:'tok') as "첫 사용";
+select status as "두 번째 사용(INVALID)" from redeem_transfer_token(:'tok');
+select status as "없는 열쇠(INVALID)" from redeem_transfer_token('nope');
+reset role; update transfer_tokens set expires_at = now() - interval '1 minute';
+set role authenticated; select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select create_transfer_token() as tok2 \gset
+reset role; update transfer_tokens set expires_at = now() - interval '1 second' where token_hash = encode(digest(:'tok2','sha256'),'hex');
+set role anon;
+select status as "만료된 열쇠(INVALID)" from redeem_transfer_token(:'tok2');

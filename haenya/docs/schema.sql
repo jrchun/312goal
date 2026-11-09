@@ -61,6 +61,14 @@ create table if not exists public.user_pins (
   updated_at   timestamptz not null default now()
 );
 
+-- 1회용 이어가기 열쇠: 로그인된 곳에서 만들어 다른 브라우저(Safari·홈 화면 아이콘)로 넘긴다. 해시만 저장
+create table if not exists public.transfer_tokens (
+  token_hash text primary key,
+  user_id    uuid not null references public.profiles (id) on delete cascade,
+  expires_at timestamptz not null,
+  used_at    timestamptz
+);
+
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
   name        text not null check (char_length(name) between 1 and 20),
@@ -227,12 +235,14 @@ alter table public.reactions     enable row level security;
 alter table public.nudges        enable row level security;
 alter table public.push_tokens   enable row level security;
 alter table public.user_pins     enable row level security;  -- 정책 없음 = 앱에서 직접 접근 불가
+alter table public.transfer_tokens enable row level security; -- 정책 없음 = 함수로만
 
 -- 수정 가능한 컬럼을 좁힌다 (예: 본인 role, 그룹 invite_code는 못 바꿈)
 revoke insert, update, delete on public.profiles, public.groups, public.group_members,
   public.seasons, public.checkins, public.reactions, public.nudges, public.push_tokens
   from anon, authenticated;
 revoke all on public.user_pins from anon, authenticated;
+revoke all on public.transfer_tokens from anon, authenticated;
 grant insert (id, nickname, avatar_url, terms_agreed_at, family_name, given_name) on public.profiles to authenticated;
 grant update (nickname, avatar_url, terms_agreed_at, family_name, given_name)     on public.profiles to authenticated;
 grant update (name, weekly_goal, season_goal)            on public.groups to authenticated;
@@ -791,6 +801,45 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 9-3. 1회용 이어가기 열쇠 (STAGE 7)
+-- ---------------------------------------------------------------------
+-- 카톡 브라우저 → Safari, Safari → 홈 화면 아이콘으로 옮길 때 숫자 없이 이어지게.
+-- 열쇠는 기본 10분, 한 번 쓰면 끝. 서버(/api/transfer)가 쓰면 그 계정 로그인 정보를 돌려준다.
+
+create or replace function public.create_transfer_token(p_minutes int default 10)
+returns text language plpgsql security definer set search_path = public, extensions as $$
+declare
+  t text := encode(gen_random_bytes(24), 'hex');
+begin
+  if auth.uid() is null then raise exception 'NOT_LOGGED_IN'; end if;
+  delete from public.transfer_tokens where user_id = auth.uid() and (expires_at < now() or used_at is not null);
+  insert into public.transfer_tokens (token_hash, user_id, expires_at)
+  values (encode(digest(t, 'sha256'), 'hex'), auth.uid(), now() + make_interval(mins => least(greatest(p_minutes, 1), 30)));
+  return t;
+end $$;
+
+create or replace function public.redeem_transfer_token(p_token text)
+returns table (status text, email text)
+language plpgsql security definer set search_path = public, extensions, auth as $$
+#variable_conflict use_column
+declare
+  r public.transfer_tokens;
+  addr text;
+begin
+  update public.transfer_tokens set used_at = now()
+   where token_hash = encode(digest(p_token, 'sha256'), 'hex') and used_at is null and expires_at > now()
+  returning * into r;
+  if not found then
+    return query select 'INVALID'::text, null::text; return;
+  end if;
+  select a.email into addr from auth.users a where a.id = r.user_id and a.email like '%@users.haenya.app';
+  if addr is null then
+    return query select 'NO_DEVICE_ACCOUNT'::text, null::text; return;
+  end if;
+  return query select 'OK'::text, addr;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 10. 함수 실행 권한
 -- ---------------------------------------------------------------------
 
@@ -806,6 +855,7 @@ revoke execute on function
   public.enforce_group_capacity()
 from public, anon, authenticated;
 grant execute on function
+  public.create_transfer_token(int),
   public.set_my_pin(text),
   public.my_pin_status(),
   public.reset_member_pin(uuid, uuid),
@@ -829,7 +879,7 @@ grant execute on function
 to authenticated;
 -- 서버(service_role) 전용
 grant execute on function public.kakao_unlink_target(text), public.delete_user_account(uuid) to service_role;
-grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text) to anon, authenticated;
+grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text), public.redeem_transfer_token(text) to anon, authenticated;
 grant execute on function public.get_invite_preview(text), public.haenya_today(),
   public.to_check_date(timestamptz), public.week_start(date)
 to anon, authenticated;

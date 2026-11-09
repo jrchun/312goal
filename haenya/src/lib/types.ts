@@ -84,3 +84,6 @@ export type PinStatus = { has_pin: boolean; is_temp: boolean };
 
 /** restore_candidates() 한 줄 */
 export type RestoreCandidate = { user_id: string; family_name: string | null; given_name: string | null; display_name: string; can_pin: boolean };
+
+/** group_week_summary() */
+export type WeekSummary = { week: string; group_total: number; group_target: number; achieved_members: number; member_count: number; nudge_count: number };

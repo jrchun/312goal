@@ -12,3 +12,7 @@ const notYet = async (): Promise<Blob> => {
 export const makeStoryCard = (_i: DidCardInput) => notYet();
 export const makeDidSquareCard = (_i: DidCardInput) => notYet();
 export const makeNudgeCard = (_i: NudgeCardInput) => notYet();
+export type WeeklyCardInput = {
+  groupName: string; weekLabel: string; groupTotal: number; groupTarget: number; achievedMembers: number; nudgeCount: number;
+};
+export const makeWeeklyCard = (_i: WeeklyCardInput) => notYet();

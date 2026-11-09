@@ -9,13 +9,15 @@ import { Screen } from '../../components/Screen';
 import { TopBar } from '../../components/TopBar';
 import { checkDate, countWord, isoWeek, weekdayLabel } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
-import { makeNudgeCard } from '../../lib/cards';
+import { makeNudgeCard, makeWeeklyCard } from '../../lib/cards';
+import { shareImage } from '../../lib/share';
+import { SaveImageSheet } from '../../components/SaveImageSheet';
 import { siteUrl } from '../../lib/invite';
 import { shareCardToKakao } from '../../lib/kakao';
 import { callName } from '../../lib/korean';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
-import type { BoardRow } from '../../lib/types';
+import type { BoardRow, WeekSummary } from '../../lib/types';
 import { color, space, type } from '../../theme';
 
 /** 홈 — "오늘 했냐?"에 답하는 화면. 이번 주 n/목표 + 인증 버튼 + 이번 주 순위 + 무소식 찌르기 */
@@ -25,6 +27,9 @@ export default function Home() {
   const [poked, setPoked] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<{ text: string; tone: 'info' | 'error' } | null>(null);
   const group = membership?.group;
+  const [summary, setSummary] = useState<WeekSummary | null>(null);
+  const [sheet, setSheet] = useState<string | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!group) return;
@@ -34,6 +39,11 @@ export default function Home() {
       return;
     }
     setRows((data as BoardRow[]) ?? []);
+    // 월요일에는 지난주 결산
+    if (new Date(`${checkDate()}T00:00:00Z`).getUTCDay() === 1) {
+      const sm = await supabase.rpc('group_week_summary', { p_group_id: group.id }).maybeSingle();
+      setSummary((sm.data as WeekSummary | null) ?? null);
+    } else setSummary(null);
   }, [group]);
 
   // 인증하고 돌아올 때마다 다시 읽는다
@@ -104,8 +114,36 @@ export default function Home() {
     }
   };
 
+  const weeklyCard = async () => {
+    if (!summary || !group) return;
+    setCardBusy(true);
+    try {
+      const blob = await makeWeeklyCard({
+        groupName: group.name,
+        weekLabel: `${summary.week.slice(0, 4)} · W${String(isoWeek(summary.week)).padStart(2, '0')} 결산`,
+        groupTotal: summary.group_total,
+        groupTarget: summary.group_target,
+        achievedMembers: summary.achieved_members,
+        nudgeCount: summary.nudge_count,
+      });
+      if ((await shareImage(blob, 'haenya-weekly.jpg')) === 'manual') setSheet(URL.createObjectURL(blob));
+    } catch {
+      setNotice({ text: '카드를 못 만들었다. 다시 해봐.', tone: 'error' });
+    }
+    setCardBusy(false);
+  };
+
   return (
     <Screen>
+      {summary && summary.member_count > 0 ? (
+        <View style={styles.summary}>
+          <Text style={[type.label, { color: color.cream }]}>지난주 결산</Text>
+          <Text style={[type.sentence, { color: color.cream }]}>
+            그룹 {summary.group_total}/{summary.group_target}회 · {summary.achieved_members}명 달성 · {summary.nudge_count}번 찔렀다.
+          </Text>
+          <Button variant="poke" label="주간 결산 카드" arrow onPress={weeklyCard} busy={cardBusy} />
+        </View>
+      ) : null}
       <TopBar left={group?.name ?? ''} right={`${today.slice(0, 4)} 시즌 · W${String(isoWeek(today)).padStart(2, '0')}`} />
       <Text style={[type.headline, styles.headline]} adjustsFontSizeToFit numberOfLines={1}>
         {doneToday ? '했다.' : '했냐?'}
@@ -158,6 +196,7 @@ export default function Home() {
       <View style={styles.notice}>
         {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       </View>
+      <SaveImageSheet uri={sheet} onClose={() => setSheet(null)} />
     </Screen>
   );
 }
@@ -171,4 +210,5 @@ const styles = StyleSheet.create({
   list: { paddingTop: space(1) },
   alone: { paddingTop: space(3) },
   notice: { paddingVertical: space(4) },
+  summary: { backgroundColor: color.black, padding: space(4), gap: space(2), marginTop: space(3) },
 });

@@ -201,6 +201,11 @@ export default function Settings() {
       ) : null}
 
       <Section>
+        <Label>홈 화면에 추가</Label>
+        <Button variant="secondary" label="홈 화면에 넣는 법" onPress={() => router.push('/onboarding?step=install' as never)} />
+      </Section>
+
+      <Section>
         <Label>내 인증 지우기</Label>
         <Text style={[type.sentence, { color: color.black }]}>마이 화면에서 사진을 누르면 지울 수 있다.</Text>
       </Section>

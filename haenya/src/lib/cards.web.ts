@@ -213,3 +213,84 @@ export async function makeNudgeCard(i: NudgeCardInput): Promise<Blob> {
   ctx.textAlign = 'left';
   return toBlob(c);
 }
+
+export type WeeklyCardInput = {
+  groupName: string;
+  weekLabel: string; // "2026 · W45 결산"
+  groupTotal: number;
+  groupTarget: number;
+  achievedMembers: number;
+  nudgeCount: number;
+};
+
+/** 주간 결산 스토리 1080×1920: 검정 바탕, 그룹 합계만 (뒤처진 멤버 이름·수치 비노출) */
+export async function makeWeeklyCard(i: WeeklyCardInput): Promise<Blob> {
+  const W = 1080;
+  const H = 1920;
+  await ensureFonts(`지난주우리는했다.그룹합계0123456789/명번주간목표달성서로찌른횟수했냐?친구랑운동인증너네그룹도${i.groupName}${i.weekLabel}`);
+  const { c, ctx } = canvasOf(W, H);
+  const m = 80;
+  ctx.fillStyle = color.black;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.fillStyle = color.cream;
+  ctx.font = `800 36px ${GOTHIC}`;
+  ctx.fillText(i.groupName, m, m + 40);
+  ctx.textAlign = 'right';
+  ctx.fillText(i.weekLabel, W - m, m + 40);
+  ctx.textAlign = 'left';
+
+  // 헤드라인 (빨강, 검정 바탕 위 큰 글자)
+  ctx.fillStyle = color.red;
+  ctx.font = `210px ${DISPLAY}`;
+  const lh = 200;
+  ['지난주', '우리는', '했다.'].forEach((t, k) => ctx.fillText(t, m - 8, m + 120 + lh * (k + 1)));
+
+  // 구분선
+  const y0 = m + 120 + lh * 3 + 90;
+  ctx.fillStyle = color.cream;
+  ctx.fillRect(m, y0, W - m * 2, 8);
+
+  ctx.font = `800 36px ${GOTHIC}`;
+  ctx.fillText('그룹 합계', m, y0 + 90);
+  ctx.font = `260px ${DISPLAY}`;
+  const total = String(i.groupTotal);
+  ctx.fillText(total, m - 6, y0 + 330);
+  const tw = ctx.measureText(total).width;
+  ctx.fillStyle = color.gray;
+  ctx.font = `150px ${DISPLAY}`;
+  ctx.fillText(`/${i.groupTarget}`, m + tw + 4, y0 + 330);
+
+  // 두 숫자: 달성 인원 · 찌른 횟수 (빨간 밑줄)
+  const y1 = y0 + 440;
+  const colW = (W - m * 2 - 60) / 2;
+  [
+    { v: `${i.achievedMembers}명`, l: '주간 목표 달성' },
+    { v: `${i.nudgeCount}번`, l: '서로 찌른 횟수' },
+  ].forEach((s2, k) => {
+    const x = m + k * (colW + 60);
+    ctx.fillStyle = color.red;
+    ctx.fillRect(x, y1, colW, 6);
+    ctx.fillStyle = color.cream;
+    ctx.font = `120px ${DISPLAY}`;
+    ctx.fillText(s2.v, x, y1 + 150);
+    ctx.font = `800 34px ${GOTHIC}`;
+    ctx.fillStyle = color.gray;
+    ctx.fillText(s2.l, x, y1 + 210);
+  });
+
+  // 아래 빨강 띠: 워드마크 + 유입 문구
+  const bandH = 230;
+  ctx.fillStyle = color.red;
+  ctx.fillRect(0, H - bandH, W, bandH);
+  ctx.fillStyle = color.black;
+  ctx.font = `100px ${DISPLAY}`;
+  ctx.fillText('했냐?', m, H - bandH / 2 + 36);
+  ctx.font = `800 34px ${GOTHIC}`;
+  ctx.textAlign = 'right';
+  ctx.fillText('친구랑 운동 인증', W - m, H - bandH / 2 - 8);
+  ctx.fillText('너네 그룹도 했냐', W - m, H - bandH / 2 + 42);
+  ctx.textAlign = 'left';
+  return toBlob(c);
+}

@@ -80,7 +80,7 @@ function Created({ group }: { group: Group }) {
       <View style={styles.actions}>
         <Notice>{msg}</Notice>
         <Button label="초대 링크 복사" onPress={share} />
-        <Button variant="secondary" label="홈으로" onPress={() => router.replace('/home')} />
+        <Button variant="secondary" label="다음" onPress={() => router.replace('/onboarding')} />
       </View>
     </Screen>
   );
