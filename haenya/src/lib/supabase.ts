@@ -17,9 +17,8 @@ export const supabase = createClient(url || 'http://localhost', anonKey || 'miss
     storage: Platform.OS === 'web' ? undefined : AsyncStorage, // 웹은 기본 localStorage
     persistSession: !isServer,
     autoRefreshToken: !isServer,
-    // 카카오 로그인 후 돌아오면 /auth/callback 화면이 직접 code를 세션으로 바꾼다
+    // 카카오 로그인은 /auth/kakao 화면이 직접 처리한다 (src/lib/auth.web.ts)
     detectSessionInUrl: false,
-    flowType: 'pkce',
   },
 });
 

@@ -136,6 +136,7 @@ begin
     new.id,
     left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
                   nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+                  nullif(trim(new.raw_user_meta_data ->> 'nickname'), ''),
                   nullif(trim(new.raw_user_meta_data ->> 'preferred_username'), ''),
                   '친구'), 20),
     coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')

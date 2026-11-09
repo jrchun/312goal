@@ -28,7 +28,7 @@
 | `/` 일반 랜딩 | `src/app/index.tsx` | STAGE 7 |
 | `/join/[code]` 초대 랜딩 | `src/app/join/[code].tsx` | STAGE 3 |
 | `/login` 카카오 로그인 + 약관 | `src/app/login.tsx` | STAGE 3 |
-| `/auth/callback` 카카오 로그인 후 돌아오는 곳 | `src/app/auth/callback.tsx` | STAGE 3 |
+| `/auth/kakao` 카카오 로그인 후 돌아오는 곳 | `src/app/auth/kakao.tsx` | STAGE 3 |
 | `/joined` 그룹 합류 확인 + 내 올해 목표 | `src/app/joined.tsx` | STAGE 3 |
 | `/terms` `/privacy` 약관 (초안은 STAGE 8) | `src/app/terms.tsx`, `privacy.tsx` | STAGE 3·8 |
 | `/create-group` | `src/app/create-group.tsx` | STAGE 3 |
@@ -40,7 +40,12 @@
 
 `public/_redirects`가 `/join/*`을 `/join/[code]`로 돌린다(Cloudflare Pages).
 
-로그인 흐름: 카카오(`src/lib/auth.web.ts` / `auth.native.ts`) → `/auth/callback?next=...` → `nextRoute()`(`src/lib/session.tsx`)가 갈 곳을 정한다.
+로그인 흐름 (카카오 OpenID Connect 직접 연동 — Supabase 기본 카카오 연동은 쓰지 않는다):
+`signInWithKakao(next)`(`src/lib/auth.web.ts`)가 scope 없이 카카오 인가 화면으로 보냄 → `/auth/kakao`(`src/app/auth/kakao.tsx`)로 돌아옴 →
+Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시크릿으로 code를 ID 토큰으로 교환 → `supabase.auth.signInWithIdToken({provider:'kakao'})` → `nextRoute()`.
+이유: Supabase의 `signInWithOAuth('kakao')`는 이메일 권한(account_email)을 강제로 요청하는데, 이메일 동의항목은 비즈 앱 + 심사가 있어야 해서 KOE205가 난다.
+카카오 콘솔 필요 설정: OpenID Connect ON, REST API 키 리다이렉트 URI에 `https://haenya.pages.dev/auth/kakao`. Cloudflare 변수: KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret), EXPO_PUBLIC_KAKAO_REST_KEY.
+`/api/kakao-token`은 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 로그인 끝까지 테스트할 수 없다(배포 주소에서 테스트).
 약관 미동의 → `/login`(동의 단계), 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
 로그인 상태·프로필·내 그룹은 `useSession()`으로 읽는다. 탭 화면은 로그인+약관+그룹이 없으면 들어올 수 없다.
 
@@ -125,7 +130,8 @@
 
 - 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 기존 `312goal` 등 다른 Pages 프로젝트는 건드리지 않는다.
 - GitHub `jrchun/312goal` 연결. 배포 브랜치 `claude/eloquent-cori-4zjqre`(main 합치면 변경), 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`. 푸시하면 자동 배포.
-- 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL.
+- 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL, EXPO_PUBLIC_KAKAO_REST_KEY, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret, 사용자가 대시보드에서 입력).
+- `functions/` 폴더는 Cloudflare Pages Functions(서버 코드). 같은 주소의 `/api/...`로 돌아간다.
 - Cloudflare Pages는 `node_modules`라는 이름의 폴더를 올리지 않는다 → `build:web`이 `scripts/fix-web-assets.mjs`로 `dist/assets/node_modules`를 `assets/_m`으로 옮긴다.
 - 웹 글꼴은 Google Fonts(`src/app/+html.tsx`), 앱은 폰트 파일(`src/lib/fonts.native.ts`). 스타일에는 `...font.display`처럼 펼쳐 쓴다(웹은 굵기를 fontWeight로).
 - `+html.tsx`는 `useServerDocumentContext()`의 headNodes·bodyNodes를 꼭 넣는다(빠지면 JS·스타일이 안 들어가 화면이 깨짐).

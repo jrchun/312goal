@@ -1,21 +1,12 @@
-import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { supabase } from './supabase';
+/**
+ * 카카오 로그인 (앱) — 2단계(iOS·안드로이드 출시) 때 구현.
+ * 웹과 같은 방식(카카오 OpenID Connect → /api/kakao-token → signInWithIdToken)을
+ * expo-web-browser 로 열 예정. 지금은 웹만 지원한다.
+ */
+export async function signInWithKakao(_next = '/'): Promise<void> {
+  throw new Error('앱 로그인은 2단계에서 지원');
+}
 
-export const KAKAO_SCOPES = 'profile_nickname profile_image';
-
-/** 카카오 로그인 (앱, 2단계용): 브라우저 창에서 로그인하고 haenya://auth/callback 으로 돌아온다. */
-export async function signInWithKakao(next = '/'): Promise<void> {
-  const redirectTo = Linking.createURL('auth/callback');
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'kakao',
-    options: { redirectTo, scopes: KAKAO_SCOPES, skipBrowserRedirect: true },
-  });
-  if (error) throw error;
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success') return;
-  const code = new URL(result.url).searchParams.get('code');
-  if (!code) return;
-  router.replace({ pathname: '/auth/callback', params: { code, next } });
+export async function completeKakaoSignIn(_params: { code?: string; state?: string }): Promise<string> {
+  throw new Error('앱 로그인은 2단계에서 지원');
 }
