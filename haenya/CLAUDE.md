@@ -17,7 +17,7 @@
 - 비즈니스 규칙(하루 1회, 날짜 판정, 찌르기 제한, 12명 제한)은 반드시 Supabase DB 함수와 RLS에 둔다. 화면은 얇게.
 - 플랫폼별로 다른 코드(카카오 공유, 이미지 저장)는 `*.web.ts` / `*.native.ts`로 분리.
 - 시간대는 항상 Asia/Seoul. 하루 기준은 새벽 3시(03:00 이전은 전날). 그래서 주간 리셋도 실제로는 월요일 03시(사용자 확인 완료).
-- Supabase는 새 프로젝트. 기존 312goal(저장소 루트의 index.html/admin.html)과 분리.
+- Supabase는 새 프로젝트. 기존 312goal(저장소의 `312goal/` 폴더, 옛 Supabase 프로젝트)과 완전히 별개 — 섞지 않는다.
 - 사용자는 개발 지식이 많지 않다. 각 작업 끝에 직접 확인하는 방법을 한국어로 알려줄 것.
 - 이 환경에서는 api.expo.dev가 막혀 있어 `npx expo install`은 `EXPO_OFFLINE=1`을 붙여 실행한다.
 
@@ -163,9 +163,9 @@
 
 ## 배포 마무리 (STAGE 8)
 
-- 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). **오픈 전 운영자 연락처(`OPERATOR_CONTACT`) 채우기 + 전문가 검토.**
+- 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). 책임자 천성우 / jrchun1@naver.com(사용자 확정). 오픈 전 전문가 검토 권장.
 - DB 휴면 방지: `.github/workflows/haenya-keepalive.yml`(매일 06:17 KST, 공개 키로 읽기 1회). GitHub 예약 실행은 **main에 이 파일이 있어야** 돈다.
-- 312goal 2026 기록 이관: `bash scripts/import-312goal.sh 2026` → `season_results`(시즌 합계만, 재실행하면 최신 숫자로 덮어씀). 옛 프로젝트는 공개 키로 읽기만. 실제 인원은 5명(천·호·고·혁·밤). **12월 31일 이후 한 번 더 실행.** group_id·user_id는 아직 비어 있음(비어 있으면 아무도 못 봄).
+- 312goal 2026 기록 이관: `bash scripts/import-312goal.sh 2026`(옛 사이트 `../312goal/index.html`의 공개 키로 읽음) → `season_results`(시즌 합계만, 재실행하면 최신 숫자로 덮어씀). 옛 프로젝트는 공개 키로 읽기만. 실제 인원은 5명(천·호·고·혁·밤). **12월 31일 이후 한 번 더 실행.** group_id·user_id는 아직 비어 있음(비어 있으면 아무도 못 봄).
 - 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
 
 ## DB (Supabase)
@@ -185,8 +185,8 @@
 
 ## 배포 (Cloudflare Pages)
 
-- 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 기존 `312goal` 등 다른 Pages 프로젝트는 건드리지 않는다.
-- GitHub `jrchun/312goal` 연결. 배포 브랜치 `claude/eloquent-cori-4zjqre`(main 합치면 변경), 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`. 푸시하면 자동 배포.
+- 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 같은 계정의 `312goal` 프로젝트는 별개(저장소 `312goal/` 폴더만 배포) — 했냐 작업 중에 건드리지 않는다.
+- GitHub `jrchun/312goal` 연결. **배포 브랜치 `main`**, 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`, 빌드 감시 경로 `haenya/*`(다른 폴더가 바뀌면 다시 빌드 안 함). main에 들어가면 자동 배포.
 - 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL, EXPO_PUBLIC_KAKAO_REST_KEY, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret, 사용자가 대시보드에서 입력).
 - `functions/` 폴더는 Cloudflare Pages Functions(서버 코드). 같은 주소의 `/api/...`로 돌아간다.
 - Cloudflare Pages는 `node_modules`라는 이름의 폴더를 올리지 않는다 → `build:web`이 `scripts/fix-web-assets.mjs`로 `dist/assets/node_modules`를 `assets/_m`으로 옮긴다.

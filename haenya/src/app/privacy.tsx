@@ -2,10 +2,10 @@ import { Doc, Section } from '../components/Doc';
 
 /**
  * 개인정보처리방침 (개인정보 보호법 제30조 기재 사항 기준 초안).
- * ⚠️ 오픈 전 확인: 운영자 연락처(OPERATOR_CONTACT), 전문가 검토.
+ * 운영자·연락처는 사용자 확정(2026-11-10). 오픈 전 전문가 검토 권장.
  */
 const OPERATOR = '천성우';
-const OPERATOR_CONTACT = '[연락처 이메일 입력 필요]';
+const OPERATOR_CONTACT = 'jrchun1@naver.com';
 
 export default function Privacy() {
   return (
