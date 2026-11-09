@@ -7,9 +7,12 @@ import { RankRow } from '../../components/RankRow';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { TopBar } from '../../components/TopBar';
-import { checkDate, countWord, isoWeek } from '../../lib/dates';
+import { checkDate, countWord, isoWeek, weekdayLabel } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
-import { inviteUrl } from '../../lib/invite';
+import { makeNudgeCard } from '../../lib/cards';
+import { siteUrl } from '../../lib/invite';
+import { shareCardToKakao } from '../../lib/kakao';
+import { callName } from '../../lib/korean';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow } from '../../lib/types';
@@ -61,8 +64,30 @@ export default function Home() {
       setNotice({ text: errorMessage(error), tone: 'info' });
       return;
     }
-    // 재촉 카드 이미지는 STAGE 5. 지금은 문장 + 링크를 공유한다
-    const text = `${r.nickname}야 했냐? 다들 기다리는 중. ${inviteUrl(group.invite_code)}`;
+    // 재촉 카드(빨강, "○○야 했냐?")를 카톡으로. 안 되면 문장 + 링크 공유
+    const days = r.days_silent;
+    try {
+      const image = await makeNudgeCard({
+        groupName: group.name,
+        weekLabel: `W${String(isoWeek(today)).padStart(2, '0')} · ${weekdayLabel()}`,
+        callName: callName(r.nickname),
+        weekCount: r.week_count,
+        weeklyGoal: r.weekly_goal,
+        daysSilent: days,
+      });
+      await shareCardToKakao({
+        image,
+        title: `${callName(r.nickname)} 했냐?`,
+        description: days > 0 ? `${days}일째 무소식. 다들 기다리는 중.` : '다들 기다리는 중.',
+        link: `${siteUrl()}/home`,
+        buttonTitle: '눌러서 인증하기',
+      });
+      setNotice({ text: `${r.nickname} 찔렀다.`, tone: 'info' });
+      return;
+    } catch (e) {
+      console.warn('nudge card share failed', e);
+    }
+    const text = `${callName(r.nickname)} 했냐? 다들 기다리는 중. ${siteUrl()}/home`;
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'share' in navigator) {
         await navigator.share({ text });

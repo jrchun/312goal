@@ -122,6 +122,14 @@ Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시�
 - 홈은 `group_week_board`를 화면에 올 때마다 다시 읽는다(useFocusEffect). 이번 주 순위는 이번 주 횟수 순, 그룹 탭은 최근 4주 순위.
 - 찌르기는 지금 문장+링크 공유. 재촉 카드 이미지는 STAGE 5. 앱(native)의 사진·로그인은 2단계.
 
+## 공유 카드 (STAGE 5)
+
+- 카드는 canvas로 직접 그린다(`src/lib/cards.web.ts`): 인증 스토리 1080×1920(`makeStoryCard`), 나 했다 1200×1200(`makeDidSquareCard`), 재촉 1200×1200(`makeNudgeCard`). 글꼴은 그리기 전에 `document.fonts.load`로 불러온다.
+- 카톡: Kakao JS SDK 2.8.4(`src/lib/kakao.web.ts`, integrity 고정) → `Share.uploadImage`로 카드 올림 → `Share.sendDefault` 피드. 링크는 `/home`. 키는 `EXPO_PUBLIC_KAKAO_JS_KEY`(공개 값).
+  카카오 콘솔: JavaScript SDK 도메인 + **제품 링크 관리 → 웹 도메인**에 사이트 주소가 있어야 한다.
+- 인스타: Web Share API로 파일 공유(`src/lib/share.web.ts`), 안 되면(카톡 인앱 등) `SaveImageSheet`로 이미지를 띄우고 "길게 눌러 저장" 안내.
+- 이름 부르기는 받침에 따라 `callName()`(민지야/고은아), 순서는 `ordinalWord()`(첫/두/세 번째) — `src/lib/korean.ts`.
+
 ## DB (Supabase)
 
 - 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).

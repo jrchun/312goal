@@ -44,3 +44,12 @@ export function stickerTime(at: Date): string {
 export function countWord(n: number): string {
   return ['', '한', '두', '세', '네', '다섯', '여섯', '일곱'][n] ?? String(n);
 }
+
+/** 지금 요일 + 때 ("월요일 밤") — 재촉 카드 위 작은 글씨 */
+export function weekdayLabel(at: Date = new Date()): string {
+  const k = new Date(at.getTime() + KST_OFFSET_MS);
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const h = k.getUTCHours();
+  const part = h < 6 ? '새벽' : h < 12 ? '아침' : h < 18 ? '낮' : '밤';
+  return `${days[k.getUTCDay()]}요일 ${part}`;
+}
