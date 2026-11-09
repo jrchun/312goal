@@ -6,6 +6,8 @@
  * 모서리 0, 그림자 0, 그라데이션 0. 구분은 검정 선, 강조는 블록.
  */
 
+import { Platform } from 'react-native';
+
 export const color = {
   // 주 색
   cream: '#F1EDE4', // 모든 화면의 바탕. 순백(#FFF) 대신 항상 이 색
@@ -19,13 +21,24 @@ export const color = {
   highlight: '#F3C8BE', // 순위표의 "나" 줄 밑줄 하이라이트
 } as const;
 
+const web = Platform.OS === 'web';
+
+/** Gothic A1: 웹은 Google Fonts 한 가족 + 굵기, 앱은 굵기마다 다른 폰트 파일 이름 */
+const gothic = (nativeName: string, weight: '400' | '600' | '800') =>
+  web ? { fontFamily: "'Gothic A1', sans-serif", fontWeight: weight } : { fontFamily: nativeName };
+
+/**
+ * 글꼴. 스타일에 펼쳐서 쓴다: { ...font.display, fontSize: 32 }
+ *  웹: Google Fonts (src/app/+html.tsx 에서 불러옴, 한글을 잘게 나눠 필요한 글자만 받음)
+ *  앱: @expo-google-fonts 폰트 파일 (src/lib/fonts.native.ts)
+ */
 export const font = {
   /** 제목·숫자·버튼. 굵기 1종뿐이라 fontWeight를 주지 않는다. */
-  display: 'BlackHanSans_400Regular',
+  display: web ? { fontFamily: "'Black Han Sans', sans-serif" } : { fontFamily: 'BlackHanSans_400Regular' },
   /** 본문·UI */
-  body: 'GothicA1_400Regular',
-  bodySemi: 'GothicA1_600SemiBold',
-  bodyBold: 'GothicA1_800ExtraBold',
+  body: gothic('GothicA1_400Regular', '400'),
+  bodySemi: gothic('GothicA1_600SemiBold', '600'),
+  bodyBold: gothic('GothicA1_800ExtraBold', '800'),
 } as const;
 
 /**
@@ -33,13 +46,13 @@ export const font = {
  * 한 화면에서 가장 큰 글자와 가장 작은 글자는 10배 이상 차이 나게 한다.
  */
 export const type = {
-  headline: { fontFamily: font.display, fontSize: 150, lineHeight: 150 * 0.85, letterSpacing: -6 },
-  progress: { fontFamily: font.display, fontSize: 92, lineHeight: 92 },
-  rankName: { fontFamily: font.display, fontSize: 32, lineHeight: 38 },
-  button: { fontFamily: font.display, fontSize: 21, lineHeight: 26 },
-  sentence: { fontFamily: font.bodyBold, fontSize: 15, lineHeight: 15 * 1.35 },
-  label: { fontFamily: font.bodyBold, fontSize: 12, letterSpacing: 2 },
-  caption: { fontFamily: font.bodySemi, fontSize: 12, color: color.bodyGray },
+  headline: { ...font.display, fontSize: 150, lineHeight: 150 * 0.85, letterSpacing: -6 },
+  progress: { ...font.display, fontSize: 92, lineHeight: 92 },
+  rankName: { ...font.display, fontSize: 32, lineHeight: 38 },
+  button: { ...font.display, fontSize: 21, lineHeight: 26 },
+  sentence: { ...font.bodyBold, fontSize: 15, lineHeight: 15 * 1.35 },
+  label: { ...font.bodyBold, fontSize: 12, letterSpacing: 2 },
+  caption: { ...font.bodySemi, fontSize: 12, color: color.bodyGray },
 } as const;
 
 /** 요소 간격은 4의 배수 */

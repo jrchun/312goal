@@ -89,7 +89,7 @@ export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?
 const styles = StyleSheet.create({
   block: { gap: space(2) },
   input: {
-    fontFamily: font.bodyBold,
+    ...font.bodyBold,
     fontSize: 22,
     color: color.black,
     paddingVertical: space(2),
@@ -106,12 +106,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepBtnText: { fontFamily: font.display, fontSize: 28, color: color.black },
-  stepValue: { fontFamily: font.display, fontSize: 64, lineHeight: 70, color: color.black },
-  stepUnit: { fontFamily: font.display, fontSize: 28, color: color.gray },
+  stepBtnText: { ...font.display, fontSize: 28, color: color.black },
+  stepValue: { ...font.display, fontSize: 64, lineHeight: 70, color: color.black },
+  stepUnit: { ...font.display, fontSize: 28, color: color.gray },
   checkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(3), minHeight: layout.minTouch },
   checkTouch: { flexDirection: 'row', alignItems: 'center', gap: space(3), flex: 1, minHeight: layout.minTouch },
   box: { width: 24, height: 24, borderWidth: 2, borderColor: color.black, alignItems: 'center', justifyContent: 'center' },
   boxOn: { backgroundColor: color.black },
-  tick: { color: color.cream, fontFamily: font.bodyBold, fontSize: 15, lineHeight: 18 },
+  tick: { color: color.cream, ...font.bodyBold, fontSize: 15, lineHeight: 18 },
 });

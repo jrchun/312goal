@@ -1,22 +1,12 @@
-import { BlackHanSans_400Regular } from '@expo-google-fonts/black-han-sans';
-import { GothicA1_400Regular, GothicA1_600SemiBold, GothicA1_800ExtraBold } from '@expo-google-fonts/gothic-a1';
-import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform } from 'react-native';
+import { useAppFonts } from '../lib/fonts';
 import { SessionProvider } from '../lib/session';
 import { color } from '../theme';
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
-    BlackHanSans_400Regular,
-    GothicA1_400Regular,
-    GothicA1_600SemiBold,
-    GothicA1_800ExtraBold,
-  });
-
-  // 웹은 정적 HTML이 바로 보이도록 폰트를 기다리지 않는다 (카톡 인앱 첫 화면 2초 목표).
-  if (!loaded && Platform.OS !== 'web') return null;
+  const loaded = useAppFonts(); // 웹은 바로 true (Google Fonts), 앱은 폰트 파일을 다 읽을 때까지 기다림
+  if (!loaded) return null;
 
   return (
     <SessionProvider>

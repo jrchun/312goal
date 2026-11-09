@@ -126,6 +126,9 @@
 - 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 기존 `312goal` 등 다른 Pages 프로젝트는 건드리지 않는다.
 - GitHub `jrchun/312goal` 연결. 배포 브랜치 `claude/eloquent-cori-4zjqre`(main 합치면 변경), 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`. 푸시하면 자동 배포.
 - 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL.
+- Cloudflare Pages는 `node_modules`라는 이름의 폴더를 올리지 않는다 → `build:web`이 `scripts/fix-web-assets.mjs`로 `dist/assets/node_modules`를 `assets/_m`으로 옮긴다.
+- 웹 글꼴은 Google Fonts(`src/app/+html.tsx`), 앱은 폰트 파일(`src/lib/fonts.native.ts`). 스타일에는 `...font.display`처럼 펼쳐 쓴다(웹은 굵기를 fontWeight로).
+- `+html.tsx`는 `useServerDocumentContext()`의 headNodes·bodyNodes를 꼭 넣는다(빠지면 JS·스타일이 안 들어가 화면이 깨짐).
 - Claude는 Cloudflare API(api.cloudflare.com, Pages 편집 토큰, 프록시 자동 주입)로 프로젝트 설정·배포 상태를 확인한다.
 - 이 주소는 카카오 콘솔(플랫폼 Web, 앱 대표 도메인)과 Supabase Redirect URLs(`https://haenya.pages.dev/**`)에 등록돼 있어야 로그인이 된다.
   Supabase 로그인 설정 변경은 Claude가 직접 못 한다(안전장치) → 사용자가 대시보드에서.

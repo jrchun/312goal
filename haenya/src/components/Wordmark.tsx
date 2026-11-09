@@ -7,7 +7,7 @@ import { color, font } from '../theme';
  */
 export function Wordmark({ size = 22, tone = 'red' }: { size?: number; tone?: 'red' | 'black' | 'cream' }) {
   const style: TextStyle = {
-    fontFamily: font.display,
+    ...font.display,
     fontSize: Math.max(22, size),
     lineHeight: Math.max(22, size) * 0.95,
     letterSpacing: -0.04 * Math.max(22, size),

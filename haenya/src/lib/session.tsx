@@ -35,7 +35,8 @@ async function loadUserData(userId: string) {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [loading, setLoading] = useState(!isServer);
+  // 서버(정적 HTML)와 브라우저 첫 화면이 같아야 하므로 둘 다 '불러오는 중'으로 시작
+  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
