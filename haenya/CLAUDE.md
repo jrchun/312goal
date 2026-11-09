@@ -93,6 +93,17 @@
 
 쓰는 것: 마침표, 반말, 숫자, 이름. 줄이는 것: 느낌표, 존댓말, "~하세요". 쓰지 않는 것: 이모지, 외모·체중 언급, 욕설.
 
+## DB (Supabase)
+
+- 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(SQL Editor에 통째로 붙여넣기, 재실행 안전).
+- 앱은 테이블에 직접 쓰지 않고 함수를 부른다: `create_group`, `join_group`, `get_invite_preview`(비로그인 가능), `submit_checkin`, `send_nudge`.
+- 화면용 집계: `group_week_board`(이번 주 보드·순위·무소식 일수), `my_stats`, `my_weeks`(52주 칸), `group_week_summary`(주간 결산).
+- 직접 쓰기는 이것만 허용: profiles(본인), groups 이름·목표(그룹장), group_members.season_goal·나가기(본인), checkins 삭제(본인), reactions(본인), push_tokens(본인).
+- 함수 오류 코드(`PHOTO_NOT_TODAY`, `ALREADY_NUDGED`, `GROUP_FULL` 등) → 문구는 `src/lib/errors.ts`. 새 코드를 만들면 둘 다 고친다.
+- 랭킹: `rank_weeks = min(연속 달성 주, 4)` 내림차순, 같으면 시즌 누적. 이번 주는 이미 달성했을 때만 연속에 포함.
+- 스키마를 바꾸면 `docs/db-test/run.sh`로 로컬 Postgres에서 검증한다.
+- 환경변수: `.env.example` → `.env.local` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
+
 ## 명령
 
 ```bash
