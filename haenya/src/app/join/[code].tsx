@@ -2,14 +2,15 @@ import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-rou
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
-import { Notice } from '../../components/Form';
+import { Label, Notice } from '../../components/Form';
+import { MemberCircles } from '../../components/MemberCircles';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { Wordmark } from '../../components/Wordmark';
 import { errorMessage } from '../../lib/errors';
 import { profileComplete, useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
-import type { InvitePreview } from '../../lib/types';
+import type { InvitePreview, RestoreCandidate } from '../../lib/types';
 import { color, line, space, type } from '../../theme';
 
 /**
@@ -23,6 +24,7 @@ export default function Join() {
   const [preview, setPreview] = useState<InvitePreview | null | undefined>(undefined); // undefined = 불러오는 중
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [members, setMembers] = useState<RestoreCandidate[]>([]);
   const joining = useRef(false);
   // 화면 아래에 깔려 있는(안 보이는) 초대 화면이 같이 합류 요청을 보내지 않게, 보이는 화면만 합류한다
   const [focused, setFocused] = useState(false);
@@ -39,6 +41,7 @@ export default function Join() {
       .rpc('get_invite_preview', { p_code: code })
       .maybeSingle()
       .then(({ data }) => setPreview((data as InvitePreview | null) ?? null));
+    supabase.rpc('restore_candidates', { p_code: code }).then(({ data }) => setMembers((data as RestoreCandidate[]) ?? []));
   }, [code]);
 
   const loggedIn = !s.loading && !!s.session;
@@ -107,6 +110,17 @@ export default function Join() {
         </View>
       ) : null}
 
+      {!s.loading && !loggedIn && members.length ? (
+        <View style={styles.members}>
+          <Label>이미 있어? 너를 눌러</Label>
+          <MemberCircles
+            members={members}
+            size={68}
+            onPick={(m) => router.push(`/restore?code=${code}&user=${m.user_id}` as never)}
+          />
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         <Notice tone="error">
           {error ||
@@ -122,15 +136,12 @@ export default function Join() {
           </>
         ) : (
           <Button
-            label="참여하기"
+            label={members.length && !loggedIn ? '처음이야. 참여하기' : '참여하기'}
             onPress={join}
             busy={busy || preview === undefined || (loggedIn && canAutoJoin)}
             disabled={!!preview?.is_full}
           />
         )}
-        {!loggedIn && !invalid ? (
-          <Button variant="text" label="나 이미 있어. 내 기록 찾기" onPress={() => router.push(`/restore?code=${code}` as never)} />
-        ) : null}
         <Text style={[type.caption, styles.center]}>앱 설치 없이 웹에서 바로 시작</Text>
       </View>
     </Screen>
@@ -147,6 +158,7 @@ const styles = StyleSheet.create({
   groupName: { color: color.black, fontSize: 24, lineHeight: 30, flexShrink: 1 },
   bar: { height: line.section, backgroundColor: color.cream, borderWidth: 1, borderColor: color.black },
   barFill: { height: '100%', backgroundColor: color.black },
+  members: { gap: space(4), paddingTop: space(8) },
   actions: { marginTop: 'auto', gap: space(2), paddingVertical: space(6) },
   center: { textAlign: 'center' },
 });
