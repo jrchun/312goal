@@ -53,6 +53,7 @@ function Consent({ next }: { next?: string }) {
   const [nickname, setNickname] = useState(s.profile?.nickname ?? '');
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
+  const [age, setAge] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,7 +62,8 @@ function Consent({ next }: { next?: string }) {
   }, [s.profile?.nickname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const name = nickname.trim();
-  const ready = name.length >= 1 && name.length <= 20 && terms && privacy;
+  const allChecked = terms && privacy && age;
+  const ready = name.length >= 1 && name.length <= 20 && allChecked;
 
   const save = async () => {
     if (!s.session || !ready) return;
@@ -99,11 +101,12 @@ function Consent({ next }: { next?: string }) {
         <Field label="닉네임" value={nickname} onChangeText={setNickname} maxLength={20} placeholder="성우" />
         <View>
           <Check
-            checked={terms && privacy}
+            checked={allChecked}
             onToggle={() => {
-              const v = !(terms && privacy);
+              const v = !allChecked;
               setTerms(v);
               setPrivacy(v);
+              setAge(v);
             }}
           >
             모두 동의
@@ -116,6 +119,9 @@ function Consent({ next }: { next?: string }) {
           <Check checked={privacy} onToggle={() => setPrivacy(!privacy)}
             right={<Button variant="text" label="보기" onPress={() => router.push('/privacy')} />}>
             개인정보 수집·이용 (필수)
+          </Check>
+          <Check checked={age} onToggle={() => setAge(!age)}>
+            만 14세 이상이다 (필수)
           </Check>
         </View>
       </View>

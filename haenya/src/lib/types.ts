@@ -31,3 +31,20 @@ export type InvitePreview = {
   season_year: number;
   is_full: boolean;
 };
+
+/** group_week_board() 한 줄 */
+export type BoardRow = {
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  is_me: boolean;
+  week_count: number;
+  weekly_goal: number;
+  season_count: number;
+  season_goal: number;
+  last_check_date: string | null;
+  days_silent: number;
+  streak_weeks: number;
+  rank_weeks: number;
+  rank: number;
+};

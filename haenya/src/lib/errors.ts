@@ -13,6 +13,8 @@ const messages: Record<string, string> = {
   NOT_A_MEMBER: '이 그룹 멤버가 아니다.',
   NOT_LOGGED_IN: '로그인부터 하자.',
   BAD_PHOTO_PATH: '사진을 다시 올려줘.',
+  UPLOAD_FAILED: '사진이 안 올라갔다. 다시 해봐.',
+  PHOTO_UNREADABLE: '이 사진은 못 읽는다. 다른 사진으로 해봐.',
 };
 
 export function errorMessage(error: unknown): string {

@@ -111,6 +111,14 @@ Cloudflare Pages Function `functions/api/kakao-token.ts`가 클라이언트 시�
 
 쓰는 것: 마침표, 반말, 숫자, 이름. 줄이는 것: 느낌표, 존댓말, "~하세요". 쓰지 않는 것: 이모지, 외모·체중 언급, 욕설.
 
+## 인증샷 (STAGE 4)
+
+- 흐름: `pickPhoto`(지금 찍기=capture / 앨범) → `preparePhoto`(`src/lib/photo.web.ts`: EXIF 촬영 시각 읽기 → 긴 변 1600px JPEG로 다시 그림) → `submitCheckin`(`src/lib/checkin.ts`: 오늘 사진인지 먼저 거름 → Storage 업로드 → `submit_checkin` → 거절되면 사진 삭제) → `/checkin-done`.
+- canvas로 다시 그려서 **EXIF가 전부 빠진다(GPS 포함)**. 테스트로 확인함. EXIF 읽기는 `exifr/dist/lite.esm.mjs` — lite는 `pick` 옵션을 쓰면 오류가 나니 쓰지 말 것.
+- 날짜 계산은 `src/lib/dates.ts`(DB와 같은 규칙). 화면·사전 확인용이고 최종 판정은 DB.
+- 홈은 `group_week_board`를 화면에 올 때마다 다시 읽는다(useFocusEffect). 이번 주 순위는 이번 주 횟수 순, 그룹 탭은 최근 4주 순위.
+- 찌르기는 지금 문장+링크 공유. 재촉 카드 이미지는 STAGE 5. 앱(native)의 사진·로그인은 2단계.
+
 ## DB (Supabase)
 
 - 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).
