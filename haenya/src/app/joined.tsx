@@ -8,6 +8,7 @@ import { Screen } from '../components/Screen';
 import { TopBar } from '../components/TopBar';
 import { displayName, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /** 그룹 합류 확인: 그룹 정보 + 내 올해 목표 */
@@ -22,7 +23,8 @@ export default function Joined() {
     if (m) setGoal(m.season_goal);
   }, [m?.season_goal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s.loading && !m) return <Redirect href="/" />;
+  const focused = useScreenFocused();
+  if (focused && !s.loading && !m) return <Redirect href="/" />;
   if (!m) return <Screen>{null}</Screen>;
 
   const save = async () => {

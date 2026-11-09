@@ -66,7 +66,7 @@ export default function Join() {
     })();
   }, [canAutoJoin, code, s]);
 
-  if (loggedIn && !agreed) return <Redirect href={`/login?next=${encodeURIComponent(`/join/${code}`)}` as never} />;
+  if (focused && loggedIn && !agreed) return <Redirect href={`/login?next=${encodeURIComponent(`/join/${code}`)}` as never} />;
 
   const join = () => router.push(`/login?next=${encodeURIComponent(`/join/${code}`)}` as never);
 

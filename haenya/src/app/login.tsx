@@ -9,6 +9,7 @@ import { registerDevice } from '../lib/device-auth';
 import { errorMessage } from '../lib/errors';
 import { nextRoute, profileComplete, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /**
@@ -34,7 +35,8 @@ export default function Start() {
     if (s.profile?.given_name && !given) setGiven(s.profile.given_name);
   }, [s.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s.loading && s.session && profileComplete(s)) return <Redirect href={nextRoute(s, next) as never} />;
+  const focused = useScreenFocused();
+  if (focused && !s.loading && s.session && profileComplete(s)) return <Redirect href={nextRoute(s, next) as never} />;
 
   const loggedIn = !!s.session;
   const agreedBefore = !!s.profile?.terms_agreed_at;

@@ -4,12 +4,15 @@ import { Button } from '../components/Button';
 import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { nextRoute, useSession } from '../lib/session';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /** 일반 랜딩 (/): 한 줄 소개 + 우리 그룹 만들기. 이미 로그인했으면 갈 곳으로 보낸다. */
 export default function Landing() {
   const s = useSession();
-  if (!s.loading && s.session) return <Redirect href={nextRoute(s) as never} />;
+  const focused = useScreenFocused();
+
+  if (focused && !s.loading && s.session) return <Redirect href={nextRoute(s) as never} />;
 
   return (
     <Screen>

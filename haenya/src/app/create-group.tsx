@@ -10,6 +10,7 @@ import { copyOrShareInvite, inviteUrl } from '../lib/invite';
 import { profileComplete, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../lib/types';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /** 그룹 만들기: 이름 · 주간 목표(기본 3) · 연간 목표(기본 150) → 초대 링크 */
@@ -22,10 +23,11 @@ export default function CreateGroup() {
   const [error, setError] = useState('');
   const [created, setCreated] = useState<Group | null>(null);
 
+  const focused = useScreenFocused();
   if (created) return <Created group={created} />;
-  if (!s.loading && !s.session) return <Redirect href="/login?next=/create-group" />;
-  if (!s.loading && s.session && !profileComplete(s)) return <Redirect href="/login?next=/create-group" />;
-  if (!s.loading && s.membership) return <Redirect href="/home" />;
+  if (focused && !s.loading && !s.session) return <Redirect href="/login?next=/create-group" />;
+  if (focused && !s.loading && s.session && !profileComplete(s)) return <Redirect href="/login?next=/create-group" />;
+  if (focused && !s.loading && s.membership) return <Redirect href="/home" />;
 
   const submit = async () => {
     setBusy(true);

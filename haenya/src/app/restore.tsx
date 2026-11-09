@@ -13,6 +13,7 @@ import { errorMessage } from '../lib/errors';
 import { nextRoute, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
 import type { RestoreCandidate } from '../lib/types';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /** 링크나 코드에서 초대 코드 8자리만 뽑기 */
@@ -52,7 +53,8 @@ export default function Restore() {
     });
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s.loading && s.session) return <Redirect href={nextRoute(s) as never} />;
+  const focused = useScreenFocused();
+  if (focused && !s.loading && s.session) return <Redirect href={nextRoute(s) as never} />;
 
   const go = async (value = pin) => {
     if (!picked || value.length !== 4 || busy) return;

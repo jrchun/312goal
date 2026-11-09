@@ -8,6 +8,7 @@ import { makeStoryCard } from '../lib/cards';
 import { checkDate, isoWeek, stickerTime } from '../lib/dates';
 import { siteUrl } from '../lib/invite';
 import { displayName, nextRoute, profileComplete, useSession } from '../lib/session';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /**
@@ -40,7 +41,8 @@ export default function Onboarding() {
     };
   }, [g, s.profile]);
 
-  if (!s.loading && (!s.session || !profileComplete(s) || !s.membership)) return <Redirect href={nextRoute(s) as never} />;
+  const focused = useScreenFocused();
+  if (focused && !s.loading && (!s.session || !profileComplete(s) || !s.membership)) return <Redirect href={nextRoute(s) as never} />;
 
   return (
     <Screen>
