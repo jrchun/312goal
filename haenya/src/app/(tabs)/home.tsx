@@ -23,7 +23,9 @@ import { askFeedView, FeedEvent, feedKey, feedText, feedTime, loadFeed } from '.
 import { isAnnual, paceSentence, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow, WeekSummary } from '../../lib/types';
-import { color, layout, space, type } from '../../theme';
+import { color, line, space, type } from '../../theme';
+
+const V = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('v')) || 'a'; // TEMP 시안 비교
 
 /** 홈 — "오늘 했냐?"에 답하는 화면. 이번 주 n/목표 + 인증 버튼 + 이번 주 순위 + 무소식 찌르기 */
 export default function Home() {
@@ -103,6 +105,12 @@ export default function Home() {
     setPoked(Object.fromEntries(d.to.map((id) => [id, true])));
     setPokedAll(d.all);
   }, [group]);
+
+  const canPoke = weekly.length > 1 && notToday.length > 0 && doneToday;
+  // 찌르기는 오늘 내가 인증해야 열린다 (DB CHECKIN_FIRST, 사용자 결정 2026-11-10)
+  const pokeLine = weekly.length < 2 || !rows ? null
+    : !notToday.length ? '오늘은 다 했다.'
+    : !doneToday ? `오늘 안 한 사람 ${notToday.length}명. 너부터 인증하면 찌를 수 있다.` : null;
 
   const openPicker = () => {
     setPicker(true);
@@ -255,9 +263,9 @@ export default function Home() {
 
       {/* 연간 목표만이면 숫자가 세 자리라 문장을 아래로 (한 줄에 다 안 들어감) */}
       <View style={[styles.progressRow, annual && styles.progressCol]}>
-        <Text style={[type.progress, { color: color.black }]}>
+        <Text style={[type.progress, styles.progress, { color: color.black }]}>
           {rows ? (annual ? me?.season_count ?? 0 : count) : ' '}
-          <Text style={{ color: color.gray, ...(annual ? { fontSize: 56 } : null) }}>/{annual ? me?.season_goal ?? '' : goal}</Text>
+          <Text style={{ color: color.gray, ...(annual ? { fontSize: 46 } : null) }}>/{annual ? me?.season_goal ?? '' : goal}</Text>
         </Text>
         <Text style={[type.sentence, styles.sentence]}>
           {me && annual && pace
@@ -272,18 +280,33 @@ export default function Home() {
       </Text>
 
       <View style={styles.cta}>
-        <Button
-          label={doneToday ? '한 장 더 올리기' : '인증샷 올리기'}
-          variant={doneToday ? 'secondary' : 'primary'}
-          onPress={() => router.push('/checkin')}
-        />
+        {canPoke && V !== 'b' ? (
+          // 인증한 날: 한 장 더 / 찌르기를 한 줄에 (빨강은 찌르기 하나)
+          <View style={styles.ctaPair}>
+            <View style={styles.ctaHalf}><Button label="한 장 더" variant="secondary" arrow={false} onPress={() => router.push('/checkin')} /></View>
+            <View style={styles.ctaHalf}><Button variant="poke" fill label={`찌르기 · ${notToday.length}명`} onPress={openPicker} /></View>
+          </View>
+        ) : (
+          <Button
+            label={doneToday ? '한 장 더 올리기' : '인증샷 올리기'}
+            variant={doneToday ? 'secondary' : 'primary'}
+            onPress={() => router.push('/checkin')}
+          />
+        )}
+        {pokeLine && V !== 'b' ? <Text style={[type.caption, styles.pokeLine]}>{pokeLine}</Text> : null}
       </View>
 
-      <View style={styles.sectionHead}>
-        <Label>{annual ? '올해 순위 · 목표 대비' : '이번 주 순위'}</Label>
+      {V === 'c' ? <Rule /> : null}
+      <View style={[styles.sectionHead, V === 'a' && styles.strip]}>
+        <Text style={[type.label, { color: V === 'a' ? color.cream : color.black }]}>{annual ? '올해 순위 · 목표 대비' : '이번 주 순위'}</Text>
+        {hiddenCount > 0 ? (
+          <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setExpanded((v) => !v)}>
+            <Text style={[type.caption, { color: V === 'a' ? color.cream : color.black }, V !== 'a' && styles.under]}>{expanded ? '접기' : `외 ${hiddenCount}명 더 보기`}</Text>
+          </Pressable>
+        ) : null}
       </View>
-      <View style={styles.list}>
-        {shown.map((r) => (
+      <View>
+        {shown.map((r, i) => (
           <RankRow
             key={r.user_id}
             name={r.nickname}
@@ -291,29 +314,20 @@ export default function Home() {
             isMe={r.is_me}
             daysSilent={r.days_silent}
             compact
+            noTopLine={V === 'a' && i === 0}
           />
         ))}
-        <Rule weight="row" />
+        {V === 'b' ? <Rule weight="row" /> : null}
       </View>
-      {hiddenCount > 0 ? (
-        <Button variant="text" label={expanded ? '접기' : `외 ${hiddenCount}명 더 보기`} onPress={() => setExpanded((v) => !v)} />
-      ) : null}
       {weekly.length === 1 ? (
         <Text style={[type.caption, styles.alone]}>아직 혼자다. 친구부터 끌어들이자.</Text>
       ) : null}
-      {weekly.length > 1 ? (
-        <View style={styles.poke}>
-          {notToday.length && !doneToday ? (
-            // 찌르기는 오늘 내가 인증해야 열린다 (DB CHECKIN_FIRST, 사용자 결정 2026-11-10)
-            <Text style={[type.sentence, { color: color.black }]}>
-              {`오늘 안 한 사람 ${notToday.length}명. 너부터 인증하면 찌를 수 있다.`}
-            </Text>
-          ) : notToday.length ? (
-            <Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={openPicker} />
-          ) : (
-            <Text style={[type.sentence, { color: color.black }]}>오늘은 다 했다.</Text>
-          )}
-        </View>
+      {V === 'b' && weekly.length > 1 ? (
+        canPoke ? (
+          <View style={styles.pokeB}><Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={openPicker} /></View>
+        ) : pokeLine ? (
+          <View style={styles.pokeBox}><Text style={[type.caption, { color: color.black }]}>{pokeLine}</Text></View>
+        ) : null
       ) : null}
       {notice ? (
         <View style={styles.notice}>
@@ -328,16 +342,17 @@ export default function Home() {
             askFeedView();
             router.navigate('/group');
           }}
-          style={styles.news}
+          style={[styles.news, V === 'c' && styles.newsBlock]}
         >
-          <View style={styles.newsHead}>
-            <Label>소식</Label>
-            <Text style={type.caption}>전체 →</Text>
+          {V === 'b' ? <Rule /> : null}
+          <View style={[styles.sectionHead, V === 'a' && styles.strip]}>
+            <Text style={[type.label, { color: V === 'b' ? color.black : color.cream }]}>소식</Text>
+            <Text style={[type.caption, { color: V === 'b' ? color.black : color.cream }]}>전체 →</Text>
           </View>
           {news.map((n) => (
             <View key={n.e.id} style={styles.newsRow}>
-              <Text style={[type.caption, styles.newsText, { color: n.warn ? color.textRed : color.black }]} numberOfLines={1}>{n.text}</Text>
-              <Text style={type.caption}>{feedTime(n.e.created_at)}</Text>
+              <Text style={[type.caption, styles.newsText, { color: V === 'c' ? color.cream : n.warn ? color.textRed : color.black }]} numberOfLines={1}>{n.text}</Text>
+              <Text style={[type.caption, V === 'c' && { color: color.cream }]}>{feedTime(n.e.created_at)}</Text>
             </View>
           ))}
         </Pressable>
@@ -357,19 +372,26 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  headline: { color: color.red, paddingTop: space(1), paddingBottom: space(1) },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(3) },
-  progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: space(1), paddingBottom: space(1) },
+  // 웹은 주소창·아래 막대만큼 화면이 짧다(아이폰 Safari 약 690px) → 홈은 제목·숫자를 조금 줄여 한 화면에 맞춘다
+  headline: { color: color.red, fontSize: 124, lineHeight: 124 * 0.85, paddingBottom: space(1) },
+  topTight: { marginBottom: -space(1) },
+  progress: { fontSize: 76, lineHeight: 76 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(2) },
+  progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: 0 },
   sentence: { color: color.black, flexShrink: 1 },
-  cta: { paddingVertical: space(2) },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: space(7) },
-  list: { paddingTop: space(1) },
+  cta: { paddingTop: space(2), paddingBottom: space(2), gap: space(1) },
+  ctaPair: { flexDirection: 'row', gap: space(2) },
+  ctaHalf: { flex: 1 },
+  pokeLine: { color: color.black },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: space(6) },
+  strip: { backgroundColor: color.black, paddingHorizontal: space(2) },
+  under: { textDecorationLine: 'underline' },
   alone: { paddingTop: space(3) },
-  poke: { paddingTop: space(2), alignItems: 'flex-start' },
-  notice: { paddingTop: space(3) },
-  // 소식 2줄까지 한 화면에 들어오게 위쪽 여백들을 줄였다 (인증 버튼·순위 제목·알림 빈칸)
-  news: { paddingTop: space(2), paddingBottom: space(2), gap: space(1) },
-  newsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pokeB: { paddingTop: space(2), alignItems: 'flex-start' },
+  pokeBox: { marginTop: space(2), borderWidth: line.row, borderColor: color.black, paddingHorizontal: space(2), paddingVertical: space(2) },
+  notice: { paddingTop: space(2) },
+  news: { paddingTop: space(2), paddingBottom: space(1), gap: 2 },
+  newsBlock: { backgroundColor: color.black, paddingHorizontal: space(2), marginTop: space(3), paddingTop: space(1) },
   newsRow: { flexDirection: 'row', gap: space(3), alignItems: 'baseline' },
   newsText: { flex: 1 },
   summary: { backgroundColor: color.black, padding: space(4), gap: space(2), marginTop: space(3) },

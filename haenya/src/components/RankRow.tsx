@@ -10,7 +10,7 @@ export const SILENT_DAYS = 3;
  *  기본 / 나 — 형광펜 밑줄 / 무소식 3일 이상 — 회색 취소선 + "N일째 무소식" + 찌르기
  */
 export function RankRow({
-  name, value, isMe, daysSilent, onPoke, poked, compact, rank, sub,
+  name, value, isMe, daysSilent, onPoke, poked, compact, rank, sub, noTopLine,
 }: {
   name: string;
   value: string;
@@ -23,11 +23,13 @@ export function RankRow({
   onPoke?: () => void;
   poked?: boolean;
   compact?: boolean;
+  /** 바로 위에 검정 띠 제목이 있을 때 윗선 생략 */
+  noTopLine?: boolean;
 }) {
   const silent = !isMe && (daysSilent ?? 0) >= SILENT_DAYS;
-  const size = compact ? 26 : type.rankName.fontSize;
+  const size = compact ? 24 : type.rankName.fontSize;
   return (
-    <View style={[styles.row, compact && styles.rowCompact]}>
+    <View style={[styles.row, compact && styles.rowCompact, noTopLine && styles.noTop]}>
       {isMe ? <View style={styles.highlight} /> : null}
       <View style={styles.left}>
         {rank !== undefined ? (
@@ -67,7 +69,8 @@ const styles = StyleSheet.create({
     borderTopColor: color.black,
     paddingVertical: space(1),
   },
-  rowCompact: { minHeight: layout.minTouch, paddingVertical: 0 },
+  rowCompact: { minHeight: 36, paddingVertical: 0 },
+  noTop: { borderTopWidth: 0 },
   // 형광펜: 글자 아래쪽 절반에 깔리는 띠
   highlight: { position: 'absolute', left: 0, right: 0, bottom: space(1), height: 12, backgroundColor: color.highlight },
   left: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
