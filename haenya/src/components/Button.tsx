@@ -16,6 +16,7 @@ export function Button({
   arrow = variant === 'primary' || variant === 'secondary',
   disabled,
   busy,
+  fill,
 }: {
   label: string;
   onPress?: () => void;
@@ -23,6 +24,8 @@ export function Button({
   arrow?: boolean;
   disabled?: boolean;
   busy?: boolean;
+  /** 부모 폭을 꽉 채운다 (poke는 기본이 글자 폭) */
+  fill?: boolean;
 }) {
   if (variant === 'text') {
     return (
@@ -39,7 +42,7 @@ export function Button({
       accessibilityState={{ disabled: !!off, busy: !!busy }}
       onPress={onPress}
       disabled={off}
-      style={[styles.base, v.box, disabled && styles.disabled]}
+      style={[styles.base, v.box, fill && styles.fill, disabled && styles.disabled]}
     >
       <Text style={[type.button, { color: v.text }]}>{label}</Text>
       {busy ? <ActivityIndicator color={v.text} /> : arrow ? <Text style={[type.button, { color: v.text }]}>→</Text> : null}
@@ -62,6 +65,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space(4),
   },
+  fill: { alignSelf: 'stretch' },
   disabled: { opacity: 0.35 },
   textBtn: { minHeight: layout.minTouch, alignItems: 'center', justifyContent: 'center' },
   textLabel: { color: color.black, textDecorationLine: 'underline' },

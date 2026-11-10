@@ -25,7 +25,7 @@ export function RankRow({
   compact?: boolean;
 }) {
   const silent = !isMe && (daysSilent ?? 0) >= SILENT_DAYS;
-  const size = compact ? 26 : type.rankName.fontSize;
+  const size = compact ? 24 : type.rankName.fontSize;
   return (
     <View style={[styles.row, compact && styles.rowCompact]}>
       {isMe ? <View style={styles.highlight} /> : null}
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     borderTopColor: color.black,
     paddingVertical: space(1),
   },
-  rowCompact: { minHeight: layout.minTouch, paddingVertical: 0 },
+  rowCompact: { minHeight: 36, paddingVertical: 0 },
   // 형광펜: 글자 아래쪽 절반에 깔리는 띠
   highlight: { position: 'absolute', left: 0, right: 0, bottom: space(1), height: 12, backgroundColor: color.highlight },
   left: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
