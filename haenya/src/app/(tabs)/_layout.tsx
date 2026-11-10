@@ -2,12 +2,12 @@ import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform, useColorScheme, View } from 'react-native';
 import { nextRoute, profileComplete, useSession } from '../../lib/session';
-import { color, font, line } from '../../theme';
+import { color, font } from '../../theme';
 
 /**
  * 하단 메뉴: 홈 · 그룹 · 마이. 아이콘 없이 글자만. 로그인·그룹이 없으면 들어올 수 없다.
  * 색은 휴대폰의 밝게/어둡게 설정을 따른다 (사용자 요청 2026-11-10: 아래 주소창·시스템 바와 어울리게)
- *  밝게: 크림 바 + 위 검정 선, 지금 탭은 검정 블록  /  어둡게: 검정 바 + 크림 글자
+ *  밝게: 크림 바(위 선 없음), 지금 탭은 검정 블록  /  어둡게: 검정 바 + 크림 글자
  * 웹은 메뉴 아래 빈 띠(사파리 주소창 뒤)도 같은 색으로 칠해 바가 화면 끝까지 이어져 보이게 한다.
  */
 export default function TabsLayout() {
@@ -37,8 +37,7 @@ export default function TabsLayout() {
         tabBarIconStyle: { display: 'none' },
         tabBarStyle: {
           backgroundColor: barColor,
-          borderTopWidth: dark ? 0 : line.row,
-          borderTopColor: color.black,
+          borderTopWidth: 0, // 화면과 메뉴 사이 선 없음 (사용자 요청 2026-11-10)
           elevation: 0,
           shadowOpacity: 0,
         },
