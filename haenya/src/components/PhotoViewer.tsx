@@ -1,28 +1,26 @@
 import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { REACTIONS } from '../lib/photos';
-import type { ReactionKey } from '../lib/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { color, font, layout, space, type } from '../theme';
-import { Button } from './Button';
-import { Notice } from './Form';
 
 export type ViewerPhoto = {
   id: string;
   url?: string;
   title: string; // "민지 · 11월 9일"
   unverified?: boolean;
-  counts: Partial<Record<ReactionKey, number>>;
-  mine: Partial<Record<ReactionKey, boolean>>;
   canDelete?: boolean;
 };
 
-/** 사진 크게 보기 + 이모지 반응 4종(누르면 켜고 끔) + 내 사진이면 지우기 */
+/**
+ * 사진 크게 보기 — 화면 전체(검정 바탕)에 사진만. 왼쪽 위 이름·날짜, 오른쪽 위 작은 ✕.
+ * 내 사진이면 아래 작은 글자로 "이 인증 지우기"(두 번 눌러야 지움).
+ * (이모지 반응은 사용자 결정 2026-11-11로 화면에서 뺐다. DB reactions 표는 남아 있음)
+ */
 export function PhotoViewer({
-  photo, onClose, onReact, onDelete,
+  photo, onClose, onDelete,
 }: {
   photo: ViewerPhoto | null;
   onClose: () => void;
-  onReact?: (key: ReactionKey) => void;
   onDelete?: () => Promise<void>;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -34,77 +32,59 @@ export function PhotoViewer({
     onClose();
   };
   return (
-    <Modal visible={!!photo} transparent animationType="fade" onRequestClose={close}>
-      <View style={styles.backdrop}>
-        {photo ? (
-          <View style={styles.box}>
-            <View style={styles.head}>
-              <Text style={[type.sentence, { color: color.cream, flexShrink: 1 }]} numberOfLines={1}>{photo.title}</Text>
-              {photo.unverified ? <Text style={styles.unverified}>날짜 미확인</Text> : null}
+    <Modal visible={!!photo} animationType="fade" onRequestClose={close}>
+      <View style={styles.root}>
+        {photo?.url ? <Image source={{ uri: photo.url }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
+        <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
+          <View style={styles.top}>
+            <View style={styles.titleBox}>
+              <Text style={[type.caption, styles.light]} numberOfLines={1}>{photo?.title}</Text>
+              {photo?.unverified ? <Text style={[type.caption, styles.light]}>날짜 미확인</Text> : null}
             </View>
-            <View style={styles.imgBox}>
-              {photo.url ? <Image source={{ uri: photo.url }} style={styles.img} resizeMode="contain" /> : null}
-            </View>
-            <View style={styles.reactions}>
-              {REACTIONS.map((r) => {
-                const on = !!photo.mine[r.key];
-                return (
-                  <Pressable
-                    key={r.key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => onReact?.(r.key)}
-                    style={[styles.reaction, on && styles.reactionOn]}
-                  >
-                    <Text style={styles.emoji}>{r.label}</Text>
-                    <Text style={[styles.count, { color: on ? color.black : color.cream }]}>{photo.counts[r.key] ?? 0}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Notice tone="error">{error}</Notice>
-            {photo.canDelete && onDelete ? (
-              confirm ? (
-                <Button
-                  variant="poke"
-                  label="정말 지운다"
-                  busy={busy}
-                  onPress={async () => {
-                    setBusy(true);
-                    try {
-                      await onDelete();
-                      setConfirm(false);
-                    } catch {
-                      setError('안 지워졌다. 다시 해봐.');
-                    }
-                    setBusy(false);
-                  }}
-                />
-              ) : (
-                <Button variant="text" label="이 인증 지우기" onPress={() => setConfirm(true)} />
-              )
-            ) : null}
-            <Button variant="secondary" label="닫기" arrow={false} onPress={close} />
+            <Pressable accessibilityRole="button" accessibilityLabel="닫기" onPress={close} style={styles.close} hitSlop={8}>
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
           </View>
-        ) : null}
+          {photo?.canDelete && onDelete ? (
+            <View style={styles.bottom}>
+              {error ? <Text style={[type.caption, { color: color.highlight }]}>{error}</Text> : null}
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={async () => {
+                  if (!confirm) return setConfirm(true);
+                  setBusy(true);
+                  try {
+                    await onDelete();
+                    setConfirm(false);
+                  } catch {
+                    setError('안 지워졌다. 다시 해봐.');
+                  }
+                  setBusy(false);
+                }}
+                style={styles.deleteTouch}
+              >
+                <Text style={[type.caption, styles.light, styles.underline]}>
+                  {busy ? '지우는 중.' : confirm ? '한 번 더 누르면 지운다' : '이 인증 지우기'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </SafeAreaView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: color.black, alignItems: 'center', justifyContent: 'center', padding: space(5) },
-  box: { width: '100%', maxWidth: layout.maxWidth, gap: space(3) },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space(2) },
-  unverified: { ...font.bodyBold, fontSize: 12, color: color.black, backgroundColor: color.cream, paddingHorizontal: space(2) },
-  imgBox: { width: '100%', aspectRatio: 3 / 4, backgroundColor: color.black },
-  img: { width: '100%', height: '100%' },
-  reactions: { flexDirection: 'row', gap: space(2) },
-  reaction: {
-    flex: 1, minHeight: layout.minTouch, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(1),
-    borderWidth: 2, borderColor: color.cream,
-  },
-  reactionOn: { backgroundColor: color.cream },
-  emoji: { fontSize: 20 },
-  count: { ...font.display, fontSize: 18 },
+  root: { flex: 1, backgroundColor: color.black },
+  overlay: { flex: 1, justifyContent: 'space-between', width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
+  top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: space(4), paddingTop: space(2) },
+  titleBox: { flexShrink: 1, gap: 2, paddingTop: space(3) },
+  light: { color: color.cream },
+  close: { width: layout.minTouch, height: layout.minTouch, alignItems: 'center', justifyContent: 'center' },
+  closeText: { ...font.bodyBold, fontSize: 20, color: color.cream },
+  bottom: { alignItems: 'center', gap: space(1), paddingBottom: space(4) },
+  deleteTouch: { minHeight: layout.minTouch, justifyContent: 'center', paddingHorizontal: space(4) },
+  underline: { textDecorationLine: 'underline' },
 });

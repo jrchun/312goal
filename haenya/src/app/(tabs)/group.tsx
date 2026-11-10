@@ -12,11 +12,10 @@ import { TopBar } from '../../components/TopBar';
 import { checkDate } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
 import { copyOrShareInvite } from '../../lib/invite';
-import { getCache, setCache, useCache } from '../../lib/cache';
+import { useCache } from '../../lib/cache';
 import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
-import type { ReactionKey } from '../../lib/types';
 import { color, font, layout, line, space, type } from '../../theme';
 
 /** 그룹 — 최근 4주 달성 순위 + 이번 주 인증샷 모음(반응) + 초대 링크 */
@@ -29,7 +28,6 @@ export default function Group() {
   const board = data?.board ?? [];
   const photos = data?.checkins ?? [];
   const urls = data?.urls ?? {};
-  const reactions = data?.reactions ?? [];
   const [open, setOpen] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [view, setView] = useState<'rank' | 'photos'>('rank');
@@ -56,41 +54,14 @@ export default function Group() {
   const viewer: ViewerPhoto | null = useMemo(() => {
     const p = photos.find((x) => x.id === open);
     if (!p) return null;
-    const mine: Partial<Record<ReactionKey, boolean>> = {};
-    const counts: Partial<Record<ReactionKey, number>> = {};
-    for (const r of reactions.filter((x) => x.checkin_id === p.id)) {
-      counts[r.emoji] = (counts[r.emoji] ?? 0) + 1;
-      if (r.user_id === me) mine[r.emoji] = true;
-    }
     const [, m, d] = p.check_date.split('-');
     return {
       id: p.id,
       url: urls[p.photo_path],
       title: `${names[p.user_id] ?? ''} · ${Number(m)}월 ${Number(d)}일`,
       unverified: !p.date_verified,
-      counts,
-      mine,
     };
-  }, [open, photos, reactions, urls, names, me]);
-
-  const react = async (emoji: ReactionKey) => {
-    if (!viewer || !me || !key) return;
-    const on = !!viewer.mine[emoji];
-    const cur = getCache<GroupTab>(key);
-    if (cur) {
-      // 화면 먼저 바꾸고 서버에 반영
-      setCache<GroupTab>(key, {
-        ...cur,
-        reactions: on
-          ? cur.reactions.filter((r) => !(r.checkin_id === viewer.id && r.user_id === me && r.emoji === emoji))
-          : [...cur.reactions, { checkin_id: viewer.id, user_id: me, emoji }],
-      });
-    }
-    const res = on
-      ? await supabase.from('reactions').delete().match({ checkin_id: viewer.id, user_id: me, emoji })
-      : await supabase.from('reactions').insert({ checkin_id: viewer.id, user_id: me, emoji });
-    if (res.error) load();
-  };
+  }, [open, photos, urls, names]);
 
   const invite = async () => {
     if (!group) return;
@@ -166,7 +137,7 @@ export default function Group() {
         </>
       ) : null}
 
-      <PhotoViewer photo={viewer} onClose={() => setOpen(null)} onReact={react} />
+      <PhotoViewer photo={viewer} onClose={() => setOpen(null)} />
     </Screen>
   );
 }

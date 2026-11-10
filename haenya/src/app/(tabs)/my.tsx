@@ -63,8 +63,6 @@ export default function My() {
       url: urls[p.photo_path],
       title: `${Number(m)}월 ${Number(d)}일${p.counted ? '' : ' · 사진만 저장'}`,
       unverified: !p.date_verified,
-      counts: {},
-      mine: {},
       canDelete: true,
     };
   }, [open, photos, urls]);
