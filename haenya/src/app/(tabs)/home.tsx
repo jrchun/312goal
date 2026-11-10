@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { Platform, Share, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Label, Notice } from '../../components/Form';
+import { PokePicker } from '../../components/PokePicker';
 import { RankRow } from '../../components/RankRow';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
@@ -26,6 +27,7 @@ import { color, space, type } from '../../theme';
 export default function Home() {
   const { membership, session } = useSession();
   const [poked, setPoked] = useState<Record<string, boolean>>({});
+  const [picker, setPicker] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'info' | 'error' } | null>(null);
   const group = membership?.group;
   const [summary, setSummary] = useState<WeekSummary | null>(null);
@@ -68,6 +70,12 @@ export default function Home() {
   const count = me?.week_count ?? 0;
   const left = Math.max(0, goal - count);
   const weekly = [...(rows ?? [])].sort((a, b) => b.week_count - a.week_count || a.nickname.localeCompare(b.nickname, 'ko'));
+  // 순위는 최대 4줄. 내가 4등 밖이면 상위 3명 + 나 (내 자리는 항상 보이게)
+  const meIdx = weekly.findIndex((r) => r.is_me);
+  const shown = meIdx >= 4 ? [...weekly.slice(0, 3), weekly[meIdx]] : weekly.slice(0, 4);
+  const hiddenCount = weekly.length - shown.length;
+  // 찌를 수 있는 사람: 오늘 아직 인증 안 한 멤버 (내가 직접 고른다)
+  const notToday = weekly.filter((r) => !r.is_me && r.last_check_date !== today);
 
   const poke = async (r: BoardRow) => {
     if (!group) return;
@@ -101,6 +109,7 @@ export default function Home() {
         buttonTitle: '눌러서 인증하기',
       });
       setNotice({ text: `${r.nickname} 찔렀다.`, tone: 'info' });
+      setPicker(false);
       return;
     } catch (e) {
       console.warn('nudge card share failed', e);
@@ -184,27 +193,38 @@ export default function Home() {
         <Button variant="text" label="전체 보기" onPress={() => router.push('/group')} />
       </View>
       <View style={styles.list}>
-        {weekly.map((r) => (
+        {shown.map((r) => (
           <RankRow
             key={r.user_id}
             name={r.nickname}
             value={String(r.week_count)}
             isMe={r.is_me}
             daysSilent={r.days_silent}
-            onPoke={() => poke(r)}
-            poked={poked[r.user_id]}
             compact
           />
         ))}
         <Rule weight="row" />
       </View>
+      {hiddenCount > 0 ? (
+        <Button variant="text" label={`외 ${hiddenCount}명 · 전체 보기 →`} onPress={() => router.push('/group')} />
+      ) : null}
       {weekly.length === 1 ? (
         <Text style={[type.caption, styles.alone]}>아직 혼자다. 친구부터 끌어들이자.</Text>
+      ) : null}
+      {weekly.length > 1 ? (
+        <View style={styles.poke}>
+          {notToday.length ? (
+            <Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={() => setPicker(true)} />
+          ) : (
+            <Text style={[type.sentence, { color: color.black }]}>오늘은 다 했다.</Text>
+          )}
+        </View>
       ) : null}
       <View style={styles.notice}>
         {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       </View>
       <SaveImageSheet uri={sheet} onClose={() => setSheet(null)} />
+      <PokePicker visible={picker} members={notToday} poked={poked} onPoke={poke} onClose={() => setPicker(false)} />
     </Screen>
   );
 }
@@ -217,6 +237,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   list: { paddingTop: space(1) },
   alone: { paddingTop: space(3) },
+  poke: { paddingTop: space(4), alignItems: 'flex-start' },
   notice: { paddingVertical: space(4) },
   summary: { backgroundColor: color.black, padding: space(4), gap: space(2), marginTop: space(3) },
 });

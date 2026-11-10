@@ -19,6 +19,7 @@ export const color = {
   bodyGray: '#5E5950', // 작은 보조 문구 (크림 위 대비 6:1 이상)
   textRed: '#C4250F', // 작은 빨간 글자 ("5일째 무소식")
   highlight: '#F3C8BE', // 순위표의 "나" 줄 밑줄 하이라이트
+  scrim: 'rgba(20,20,20,0.6)', // 아래에서 올라오는 창 뒤 어두운 막 (검정 60%)
 } as const;
 
 const web = Platform.OS === 'web';

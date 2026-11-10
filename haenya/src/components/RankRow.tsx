@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { color, font, line, space, type } from '../theme';
+import { color, font, layout, line, space, type } from '../theme';
 import { Button } from './Button';
 
 /** 무소식으로 보는 기준 (일) */
@@ -27,11 +27,11 @@ export function RankRow({
   const silent = !isMe && (daysSilent ?? 0) >= SILENT_DAYS;
   const size = compact ? 26 : type.rankName.fontSize;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, compact && styles.rowCompact]}>
       {isMe ? <View style={styles.highlight} /> : null}
       <View style={styles.left}>
         {rank !== undefined ? (
-          <Text style={{ ...font.display, fontSize: 22, width: 26, color: rank === 1 ? color.red : color.black }}>{rank}</Text>
+          <Text numberOfLines={1} style={{ ...font.display, fontSize: 22, width: 34, color: rank === 1 ? color.red : color.black }}>{rank}</Text>
         ) : null}
         <Text
           numberOfLines={1}
@@ -67,8 +67,9 @@ const styles = StyleSheet.create({
     borderTopColor: color.black,
     paddingVertical: space(1),
   },
+  rowCompact: { minHeight: layout.minTouch, paddingVertical: 0 },
   // 형광펜: 글자 아래쪽 절반에 깔리는 띠
-  highlight: { position: 'absolute', left: 0, right: 0, bottom: space(2), height: 14, backgroundColor: color.highlight },
+  highlight: { position: 'absolute', left: 0, right: 0, bottom: space(1), height: 12, backgroundColor: color.highlight },
   left: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
   strike: { textDecorationLine: 'line-through', textDecorationColor: color.red },
   silent: { ...font.bodyBold, fontSize: 12, color: color.textRed },
