@@ -7,6 +7,7 @@ import { MemberCircles } from '../../components/MemberCircles';
 import { Rule } from '../../components/Rule';
 import { Screen } from '../../components/Screen';
 import { Wordmark } from '../../components/Wordmark';
+import { clearCache } from '../../lib/cache';
 import { errorMessage } from '../../lib/errors';
 import { profileComplete, useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
@@ -110,13 +111,25 @@ export default function Join() {
         </View>
       ) : null}
 
-      {!s.loading && !loggedIn && members.length ? (
+      {!s.loading && (!loggedIn || otherGroup) && members.length ? (
         <View style={styles.members}>
-          <Label>이미 있어? 너를 눌러</Label>
+          <Label>{otherGroup ? '이 그룹 사람이야? 너를 눌러' : '이미 있어? 너를 눌러'}</Label>
+          {otherGroup ? (
+            <Text style={[type.caption, styles.switchNote]}>
+              지금은 다른 그룹({s.membership?.group.name}) 계정으로 들어와 있다. 누르면 이 폰에서는 그 계정에서 나가고 이 그룹으로 간다.
+            </Text>
+          ) : null}
           <MemberCircles
             members={members}
             size={68}
-            onPick={(m) => router.push(`/restore?code=${code}&user=${m.user_id}` as never)}
+            onPick={async (m) => {
+              // 다른 그룹 계정으로 로그인돼 있으면 이 브라우저에서만 로그아웃(다른 기기는 그대로) → 내 자리로
+              if (otherGroup) {
+                clearCache();
+                await supabase.auth.signOut({ scope: 'local' });
+              }
+              router.push(`/restore?code=${code}&user=${m.user_id}` as never);
+            }}
           />
         </View>
       ) : null}
@@ -125,10 +138,12 @@ export default function Join() {
         <Notice tone="error">
           {error ||
             (preview?.is_full && !alreadyHere ? errorMessage({ message: 'GROUP_FULL' }) : '') ||
-            (otherGroup ? errorMessage({ message: 'ALREADY_IN_GROUP' }) : '')}
+            (otherGroup && !members.length ? errorMessage({ message: 'ALREADY_IN_GROUP' }) : '')}
         </Notice>
-        {invalid || otherGroup ? (
-          <Button label={otherGroup ? '내 그룹으로' : '처음으로'} onPress={() => router.replace(otherGroup ? '/home' : '/')} />
+        {otherGroup ? (
+          <Button variant="text" label={`원래 그룹(${s.membership?.group.name})으로`} onPress={() => router.replace('/home')} />
+        ) : invalid ? (
+          <Button label="처음으로" onPress={() => router.replace('/')} />
         ) : alreadyHere ? (
           <>
             <Notice>이미 이 그룹이다.</Notice>
@@ -153,6 +168,7 @@ const styles = StyleSheet.create({
   headline: { color: color.red, paddingTop: space(4), paddingBottom: space(2) },
   headlineSmall: { fontSize: 96, lineHeight: 96 * 0.9, letterSpacing: -4 },
   sentence: { color: color.black, paddingTop: space(4) },
+  switchNote: { paddingBottom: space(3) },
   card: { marginTop: space(6), borderWidth: 2, borderColor: color.black, padding: space(4), gap: space(3) },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space(3) },
   groupName: { color: color.black, fontSize: 24, lineHeight: 30, flexShrink: 1 },

@@ -43,6 +43,7 @@
 
 로그인 = **기기 등록 + 이름·숫자 4자리로 되찾기** (사용자 확정 2026-11-09. 카카오 로그인은 나중에 확대용으로 남김):
 - 시작하기(`/login`): 성·이름·숫자 4자리·약관 한 화면 → `registerDevice()`(`src/lib/device-auth.ts`): `/api/register`가 가짜 이메일(무작위@users.haenya.app)+비밀번호를 주고 `supabase.auth.signUp`. 이 브라우저는 계속 자동 로그인.
+- 다른 그룹 계정으로 로그인된 채 초대 링크를 열면: 막지 않고 이 그룹 동그라미를 보여준다 → 누르면 이 브라우저에서만 로그아웃(`signOut({scope:'local'})`) 후 내 자리로.
 - 초대 링크 화면에 멤버 이름 동그라미가 바로 보인다 → 누르면 `/restore?code=&user=`로 숫자 입력, 4자리를 다 누르면 자동으로 들어간다.
 - 나 이미 있어(`/restore?code=`): 초대 코드로 멤버 목록(`restore_candidates`) → 이름 고르고 4자리 → `/api/restore`가 DB `verify_pin`(5번 틀리면 15분 잠금)으로 확인 → 같은 비밀번호를 다시 만들어 `signInWithPassword`.
 - 비밀번호 = HMAC-SHA256(Cloudflare Secret `HAENYA_AUTH_SECRET`, 이메일). **⚠️ 이 Secret을 바꾸면 모든 사용자의 되찾기가 깨진다. 절대 바꾸지 말 것.**
@@ -224,7 +225,7 @@
 - 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL, EXPO_PUBLIC_KAKAO_REST_KEY, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret, 사용자가 대시보드에서 입력).
 - `functions/` 폴더는 Cloudflare Pages Functions(서버 코드). 같은 주소의 `/api/...`로 돌아간다.
 - Cloudflare Pages는 `node_modules`라는 이름의 폴더를 올리지 않는다 → `build:web`이 `scripts/fix-web-assets.mjs`로 `dist/assets/node_modules`를 `assets/_m`으로 옮긴다.
-- 웹 글꼴은 Google Fonts(`src/app/+html.tsx`), 앱은 폰트 파일(`src/lib/fonts.native.ts`). 스타일에는 `...font.display`처럼 펼쳐 쓴다(웹은 굵기를 fontWeight로).
+- 웹 글꼴: 제목 Black Han Sans는 직접 올린 `public/fonts/black-han-sans.woff2`(한글 전체 185KB, preload + font-display:block — 얇은 기본 글꼴로 보였다가 굵게 바뀌던 문제, 사용자 제보 2026-11-10), 본문 Gothic A1은 Google Fonts(`src/app/+html.tsx`). 앱은 폰트 파일(`src/lib/fonts.native.ts`). 스타일에는 `...font.display`처럼 펼쳐 쓴다(웹은 굵기를 fontWeight로).
 - `+html.tsx`는 `useServerDocumentContext()`의 headNodes·bodyNodes를 꼭 넣는다(빠지면 JS·스타일이 안 들어가 화면이 깨짐).
 - Claude는 Cloudflare API(api.cloudflare.com, Pages 편집 토큰, 프록시 자동 주입)로 프로젝트 설정·배포 상태를 확인한다.
 - 이 주소는 카카오 콘솔(플랫폼 Web, 앱 대표 도메인)과 Supabase Redirect URLs(`https://haenya.pages.dev/**`)에 등록돼 있어야 로그인이 된다.
