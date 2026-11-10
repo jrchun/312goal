@@ -1,6 +1,7 @@
 /** 인증 사진 (앱) — 2단계에서 expo-image-picker 로 구현. 지금은 웹만 지원 */
 export type PreparedPhoto = {
   blob: Blob;
+  thumb?: Blob;
   previewUrl: string;
   takenAt: Date | null;
   takenAtSource: 'exif' | 'capture' | null;

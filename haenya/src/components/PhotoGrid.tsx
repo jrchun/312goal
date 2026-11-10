@@ -1,7 +1,8 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LazyImage } from './LazyImage';
 import { color, font, space } from '../theme';
 
-export type GridItem = { id: string; url?: string; label?: string; isMe?: boolean; unverified?: boolean };
+export type GridItem = { id: string; url?: string; thumb?: string; label?: string; isMe?: boolean; unverified?: boolean };
 
 /** 정사각 사진 격자. 이름표는 왼쪽 아래 검정 스티커(나는 빨강), 날짜 미확인은 오른쪽 위 작은 표시 */
 export function PhotoGrid({ items, cols, onPress }: { items: GridItem[]; cols: number; onPress?: (id: string) => void }) {
@@ -12,9 +13,9 @@ export function PhotoGrid({ items, cols, onPress }: { items: GridItem[]; cols: n
         <Pressable
           key={it.id}
           onPress={() => onPress?.(it.id)}
-          style={{ width: `${(100 - ((cols - 1) * gap * 100) / 350) / cols}%`, aspectRatio: 1, backgroundColor: color.gray }}
+          style={{ overflow: 'hidden', width: `${(100 - ((cols - 1) * gap * 100) / 350) / cols}%`, aspectRatio: 1, backgroundColor: color.gray }}
         >
-          {it.url ? <Image source={{ uri: it.url }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+          <LazyImage key={it.thumb ?? it.url} src={it.thumb} fallback={it.url} />
           {it.label ? (
             <View style={[styles.tag, { backgroundColor: it.isMe ? color.red : color.black }]}>
               <Text style={[styles.tagText, { color: it.isMe ? color.black : color.cream }]} numberOfLines={1}>{it.label}</Text>

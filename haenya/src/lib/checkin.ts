@@ -4,6 +4,7 @@
  */
 import { checkDate } from './dates';
 import type { PreparedPhoto } from './photo';
+import { thumbOf } from './photos';
 import { CHECKIN_BUCKET, supabase } from './supabase';
 
 export type CheckinResult = {
@@ -40,6 +41,13 @@ export async function submitCheckin(groupId: string, userId: string, photo: Prep
     upsert: false,
   });
   if (up.error) throw new Error('UPLOAD_FAILED');
+  // 작은 사진(격자용). 실패해도 인증은 그대로 — 화면이 큰 사진으로 대신 보여준다
+  if (photo.thumb) {
+    await supabase.storage
+      .from(CHECKIN_BUCKET)
+      .upload(thumbOf(path), photo.thumb, { contentType: 'image/jpeg', upsert: false })
+      .catch(() => undefined);
+  }
 
   const { data, error } = await supabase
     .rpc('submit_checkin', {
@@ -49,7 +57,7 @@ export async function submitCheckin(groupId: string, userId: string, photo: Prep
     })
     .single();
   if (error || !data) {
-    await supabase.storage.from(CHECKIN_BUCKET).remove([path]); // 거절되면 올린 사진도 지운다
+    await supabase.storage.from(CHECKIN_BUCKET).remove([path, thumbOf(path)]); // 거절되면 올린 사진도 지운다
     throw new Error(error?.message ?? 'SUBMIT_FAILED');
   }
   last = { ...(data as Omit<CheckinResult, 'previewUrl' | 'takenAt'>), previewUrl: photo.previewUrl, takenAt: photo.takenAt };

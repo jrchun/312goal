@@ -3,7 +3,7 @@
  * 홈에서 미리 불러 두면 그룹·마이 탭이 바로 뜬다.
  */
 import { fetchInto } from './cache';
-import { signedUrls } from './photos';
+import { signedUrls, thumbOf } from './photos';
 import { supabase } from './supabase';
 import type { BoardRow, CheckinRow, MyStats, MyWeek, ReactionRow } from './types';
 
@@ -19,7 +19,7 @@ export function loadGroupTab(gid: string): Promise<GroupTab> {
     const { data, error } = await supabase.rpc('group_tab', { p_group_id: gid });
     if (error) throw new Error(error.message);
     const d = data as Omit<GroupTab, 'urls'>;
-    const urls = await signedUrls(d.checkins.map((c) => c.photo_path));
+    const urls = await signedUrls(d.checkins.flatMap((c) => [c.photo_path, thumbOf(c.photo_path)]));
     return { ...d, urls };
   });
 }
@@ -29,7 +29,7 @@ export function loadMyTab(gid: string, uid: string): Promise<MyTab> {
     const { data, error } = await supabase.rpc('my_tab', { p_group_id: gid });
     if (error) throw new Error(error.message);
     const d = data as Omit<MyTab, 'urls'>;
-    const urls = await signedUrls(d.photos.map((c) => c.photo_path));
+    const urls = await signedUrls(d.photos.flatMap((c) => [c.photo_path, thumbOf(c.photo_path)]));
     return { ...d, urls };
   });
 }

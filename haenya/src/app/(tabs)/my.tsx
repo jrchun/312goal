@@ -10,6 +10,7 @@ import { Screen } from '../../components/Screen';
 import { deleteCheckin } from '../../lib/account';
 import { checkDate, weekStart } from '../../lib/dates';
 import { useCache } from '../../lib/cache';
+import { thumbOf } from '../../lib/photos';
 import { loadMyTab, MyTab, myKey } from '../../lib/tabData';
 import { displayName, useSession } from '../../lib/session';
 import { color, font, line, space, type } from '../../theme';
@@ -62,6 +63,7 @@ export default function My() {
         return {
           id: p.id,
           url: urls[p.photo_path],
+          thumb: urls[thumbOf(p.photo_path)],
           title: `${Number(m)}월 ${Number(d)}일`,
           subtitle: notes.join(' · ') || undefined,
           canDelete: true,
@@ -127,7 +129,7 @@ export default function My() {
         {photos.length ? (
           <PhotoGrid
             cols={4}
-            items={photos.map((p) => ({ id: p.id, url: urls[p.photo_path], unverified: !p.date_verified }))}
+            items={photos.map((p) => ({ id: p.id, url: urls[p.photo_path], thumb: urls[thumbOf(p.photo_path)], unverified: !p.date_verified }))}
             onPress={setOpen}
           />
         ) : (

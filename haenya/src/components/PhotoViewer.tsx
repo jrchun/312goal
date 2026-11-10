@@ -4,11 +4,14 @@ import {
   useWindowDimensions, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LazyImage } from './LazyImage';
 import { color, font, layout, space, type } from '../theme';
 
 export type ViewerPhoto = {
   id: string;
   url?: string;
+  /** 아래 작은 줄용 작은 사진 (없으면 url) */
+  thumb?: string;
   title: string; // 위 가운데 굵게: "민지" 또는 "11월 9일"
   subtitle?: string; // 그 아래 작게: "11월 9일 · 날짜 미확인"
   canDelete?: boolean;
@@ -194,7 +197,7 @@ export function PhotoViewer({
                   onPress={() => go(i)}
                   style={[styles.thumb, i === index && styles.thumbOn]}
                 >
-                  {p.url ? <Image source={{ uri: p.url }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+                  <LazyImage key={p.thumb ?? p.url} src={p.thumb} fallback={p.url} />
                 </Pressable>
               ))}
             </ScrollView>
@@ -223,6 +226,6 @@ const styles = StyleSheet.create({
   underline: { textDecorationLine: 'underline' },
   strip: { flexGrow: 0, paddingTop: space(2) },
   stripInner: { gap: THUMB_GAP, paddingHorizontal: layout.gutter },
-  thumb: { width: THUMB_W, height: THUMB_H, backgroundColor: color.bodyGray, opacity: 0.6 },
+  thumb: { overflow: 'hidden', width: THUMB_W, height: THUMB_H, backgroundColor: color.bodyGray, opacity: 0.6 },
   thumbOn: { opacity: 1, borderWidth: 2, borderColor: color.cream },
 });

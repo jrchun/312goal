@@ -66,6 +66,9 @@ export default function Settings() {
     say(key, ok);
   };
 
+  // 저장 버튼은 바꾼 칸 아래에만 나타난다 (사용자 확정 2026-11-10)
+  const nameChanged = family.trim() !== (s.profile?.family_name ?? '') || given.trim() !== (s.profile?.given_name ?? '');
+
   const back = () => (router.canGoBack() ? router.back() : router.replace('/my'));
 
   return (
@@ -86,11 +89,11 @@ export default function Settings() {
           </View>
         </View>
         <Notice tone={msg.nick?.tone}>{msg.nick?.text}</Notice>
+        {nameChanged ? (
         <Button
-          variant="secondary"
           label="이름 저장"
           busy={busy === 'nick'}
-          disabled={!family.trim() || !given.trim() || (family.trim() === s.profile?.family_name && given.trim() === s.profile?.given_name)}
+          disabled={!family.trim() || !given.trim()}
           onPress={() =>
             run(
               'nick',
@@ -103,36 +106,37 @@ export default function Settings() {
             )
           }
         />
+        ) : null}
       </Section>
 
       <Section>
         <PinField label="내 숫자 4자리 바꾸기" value={newPin} onChange={setNewPin} />
         <Notice tone={msg.pin?.tone}>{msg.pin?.text}</Notice>
-        <Button
-          variant="secondary"
-          label="숫자 저장"
-          busy={busy === 'pin'}
-          disabled={newPin.length !== 4}
-          onPress={async () => {
-            await run('pin', () => supabase.rpc('set_my_pin', { p_pin: newPin }), '바꿨다. 새 숫자 잊지 마.');
-            setNewPin('');
-          }}
-        />
+        {newPin.length === 4 ? (
+          <Button
+            label="숫자 저장"
+            busy={busy === 'pin'}
+            onPress={async () => {
+              await run('pin', () => supabase.rpc('set_my_pin', { p_pin: newPin }), '바꿨다. 새 숫자 잊지 마.');
+              setNewPin('');
+            }}
+          />
+        ) : null}
       </Section>
 
       {m && g ? (
         <Section>
           <Stepper label="내 올해 목표" value={myGoal} onChange={setMyGoal} min={10} max={366} step={10} unit="회" />
           <Notice tone={msg.goal?.tone}>{msg.goal?.text}</Notice>
-          <Button
-            variant="secondary"
-            label="목표 저장"
-            busy={busy === 'goal'}
-            disabled={myGoal === m.season_goal}
-            onPress={() =>
-              run('goal', () => supabase.from('group_members').update({ season_goal: myGoal }).eq('group_id', g.id).eq('user_id', uid!), '바꿨다.')
-            }
-          />
+          {myGoal !== m.season_goal ? (
+            <Button
+              label="목표 저장"
+              busy={busy === 'goal'}
+              onPress={() =>
+                run('goal', () => supabase.from('group_members').update({ season_goal: myGoal }).eq('group_id', g.id).eq('user_id', uid!), '바꿨다.')
+              }
+            />
+          ) : null}
         </Section>
       ) : null}
 
@@ -143,11 +147,11 @@ export default function Settings() {
           <Stepper label="주간 목표 (모두 같이)" value={gWeekly} onChange={setGWeekly} min={1} max={7} unit="회" />
           <Stepper label="새 멤버 기본 올해 목표" value={gSeason} onChange={setGSeason} min={10} max={366} step={10} unit="회" />
           <Notice tone={msg.group?.tone}>{msg.group?.text}</Notice>
+          {gName.trim() !== g.name || gWeekly !== g.weekly_goal || gSeason !== g.season_goal ? (
           <Button
-            variant="secondary"
             label="그룹 설정 저장"
             busy={busy === 'group'}
-            disabled={!gName.trim() || (gName.trim() === g.name && gWeekly === g.weekly_goal && gSeason === g.season_goal)}
+            disabled={!gName.trim()}
             onPress={() =>
               run(
                 'group',
@@ -156,6 +160,7 @@ export default function Settings() {
               )
             }
           />
+          ) : null}
         </Section>
       ) : null}
 

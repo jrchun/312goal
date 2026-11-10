@@ -13,6 +13,7 @@ import { checkDate } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
 import { copyOrShareInvite } from '../../lib/invite';
 import { useCache } from '../../lib/cache';
+import { thumbOf } from '../../lib/photos';
 import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
@@ -59,6 +60,7 @@ export default function Group() {
         return {
           id: p.id,
           url: urls[p.photo_path],
+          thumb: urls[thumbOf(p.photo_path)],
           title: names[p.user_id] ?? '',
           subtitle: `${Number(m)}월 ${Number(d)}일${p.date_verified ? '' : ' · 날짜 미확인'}`,
         };
@@ -94,6 +96,7 @@ export default function Group() {
   const items = photos.map((p) => ({
     id: p.id,
     url: urls[p.photo_path],
+    thumb: urls[thumbOf(p.photo_path)],
     label: names[p.user_id],
     isMe: p.user_id === me,
     unverified: !p.date_verified,

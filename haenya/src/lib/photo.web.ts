@@ -16,9 +16,12 @@ export type PreparedPhoto = {
   takenAtSource: 'exif' | 'capture' | null;
   width: number;
   height: number;
+  /** 격자·작은 줄용 작은 사진 (긴 변 480px). 사진이 많아져도 탭이 느려지지 않게 */
+  thumb?: Blob;
 };
 
 const MAX_EDGE = 1600;
+const THUMB_EDGE = 480;
 const QUALITY = 0.82;
 
 /** 파일 고르기 창을 연다. 취소하면 null */
@@ -110,5 +113,17 @@ export async function preparePhoto(file: File, mode: 'camera' | 'album' = 'album
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('ENCODE_FAILED'))), 'image/jpeg', QUALITY),
   );
-  return { blob, previewUrl: URL.createObjectURL(blob), takenAt, takenAtSource, width: w, height: h };
+  // 작은 사진: 방금 그린 큰 그림을 줄여서 (메타정보 없음)
+  let thumb: Blob | undefined;
+  try {
+    const ts = Math.min(1, THUMB_EDGE / Math.max(w, h));
+    const tc = document.createElement('canvas');
+    tc.width = Math.round(w * ts);
+    tc.height = Math.round(h * ts);
+    tc.getContext('2d')?.drawImage(canvas, 0, 0, tc.width, tc.height);
+    thumb = await new Promise<Blob | undefined>((resolve) => tc.toBlob((b) => resolve(b ?? undefined), 'image/jpeg', 0.75));
+  } catch {
+    thumb = undefined;
+  }
+  return { blob, previewUrl: URL.createObjectURL(blob), takenAt, takenAtSource, width: w, height: h, thumb };
 }

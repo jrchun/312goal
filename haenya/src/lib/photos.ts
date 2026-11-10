@@ -4,6 +4,9 @@
  */
 import { CHECKIN_BUCKET, supabase } from './supabase';
 
+/** 작은 사진 경로: abc.jpg → abc_t.jpg (2026-11-10 이후 인증부터 있음. 없으면 큰 사진으로) */
+export const thumbOf = (path: string) => path.replace(/\.jpg$/, '_t.jpg');
+
 const LIFETIME_S = 3600;
 const REUSE_MS = 50 * 60 * 1000; // 만든 지 50분까지 재사용
 const signed = new Map<string, { url: string; at: number }>();

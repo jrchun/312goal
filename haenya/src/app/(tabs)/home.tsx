@@ -29,6 +29,7 @@ export default function Home() {
   const [poked, setPoked] = useState<Record<string, boolean>>({});
   const [pokedAll, setPokedAll] = useState(false);
   const [picker, setPicker] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'info' | 'error' } | null>(null);
   const group = membership?.group;
   const [summary, setSummary] = useState<WeekSummary | null>(null);
@@ -73,8 +74,10 @@ export default function Home() {
   const weekly = [...(rows ?? [])].sort((a, b) => b.week_count - a.week_count || a.nickname.localeCompare(b.nickname, 'ko'));
   // 순위는 최대 4줄. 내가 4등 밖이면 상위 3명 + 나 (내 자리는 항상 보이게)
   const meIdx = weekly.findIndex((r) => r.is_me);
-  const shown = meIdx >= 4 ? [...weekly.slice(0, 3), weekly[meIdx]] : weekly.slice(0, 4);
-  const hiddenCount = weekly.length - shown.length;
+  // "더 보기"는 그룹 탭(4주 기준)으로 가지 않고 여기서 펼친다 → 같은 이번 주 기준 순위 (사용자 확정 2026-11-10)
+  const top = meIdx >= 4 ? [...weekly.slice(0, 3), weekly[meIdx]] : weekly.slice(0, 4);
+  const shown = expanded ? weekly : top;
+  const hiddenCount = weekly.length - top.length;
   // 찌를 수 있는 사람: 오늘 아직 인증 안 한 멤버 (내가 직접 고른다)
   const notToday = weekly.filter((r) => !r.is_me && r.last_check_date !== today);
 
@@ -251,7 +254,7 @@ export default function Home() {
         <Rule weight="row" />
       </View>
       {hiddenCount > 0 ? (
-        <Button variant="text" label={`외 ${hiddenCount}명 · 전체 보기 →`} onPress={() => router.push('/group')} />
+        <Button variant="text" label={expanded ? '접기' : `외 ${hiddenCount}명 더 보기`} onPress={() => setExpanded((v) => !v)} />
       ) : null}
       {weekly.length === 1 ? (
         <Text style={[type.caption, styles.alone]}>아직 혼자다. 친구부터 끌어들이자.</Text>
