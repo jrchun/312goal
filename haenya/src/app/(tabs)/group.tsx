@@ -1,7 +1,6 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Label, Notice } from '../../components/Form';
 import { PhotoGrid } from '../../components/PhotoGrid';
@@ -33,9 +32,6 @@ export default function Group() {
   const reactions = data?.reactions ?? [];
   const [open, setOpen] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
-  // 시안 비교용: ?v=a (위에서 전환) / ?v=b (사진 옆으로 넘기기)
-  const { v } = useLocalSearchParams<{ v?: string }>();
-  const variant: 'a' | 'b' = v === 'b' ? 'b' : 'a';
   const [view, setView] = useState<'rank' | 'photos'>('rank');
 
   // 저장된 게 있으면 바로 보여주고, 탭에 올 때마다 뒤에서 새로 받는다 (요청 1번)
@@ -142,9 +138,9 @@ export default function Group() {
 
       {!data ? <Text style={[type.caption, styles.loading]}>불러오는 중.</Text> : null}
 
-      {data && variant === 'a' ? (
+      {data ? (
         <>
-          {/* A안: 순위 / 이번 주 사진 중 하나만 */}
+          {/* 순위 / 이번 주 사진 중 하나만 보여서 꽉 찬 그룹(12명)도 한 화면에 들어간다 (사용자 확정 A안) */}
           <View style={styles.seg}>
             {(
               [
@@ -170,35 +166,6 @@ export default function Group() {
         </>
       ) : null}
 
-      {data && variant === 'b' ? (
-        <>
-          {/* B안: 순위 + 사진 한 줄(옆으로 넘기기) */}
-          <View style={styles.section}>
-            <Label>최근 4주 달성 순위</Label>
-            {rankList}
-          </View>
-          <View style={styles.section}>
-            <View style={styles.sectionHead}>
-              <Label>이번 주 인증샷</Label>
-              <Text style={type.caption}>{photos.length}장 · 옆으로 →</Text>
-            </View>
-            {photos.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-                {items.map((it) => (
-                  <Pressable key={it.id} onPress={() => setOpen(it.id)} style={styles.stripItem}>
-                    {it.url ? <Image source={{ uri: it.url }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
-                    <View style={[styles.stripTag, { backgroundColor: it.isMe ? color.red : color.black }]}>
-                      <Text style={{ ...font.bodyBold, fontSize: 11, color: it.isMe ? color.black : color.cream }}>{it.label}</Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : (
-              empty
-            )}
-          </View>
-        </>
-      ) : null}
       <PhotoViewer photo={viewer} onClose={() => setOpen(null)} onReact={react} />
     </Screen>
   );
@@ -212,10 +179,5 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: color.black },
   segOff: { backgroundColor: color.cream },
   note: { paddingTop: space(2) },
-  section: { gap: space(2), paddingTop: space(4) },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  strip: { gap: 4 },
-  stripItem: { width: 104, height: 104, backgroundColor: color.gray },
-  stripTag: { position: 'absolute', left: space(1), bottom: space(1), paddingHorizontal: 6, paddingVertical: 1 },
   loading: { paddingTop: space(5) },
 });
