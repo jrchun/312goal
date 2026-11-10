@@ -13,7 +13,7 @@ export type CheckinResult = {
   counted: boolean;
   date_verified: boolean;
   week_count: number;
-  weekly_goal: number;
+  weekly_goal: number | null;
   season_count: number;
   season_goal: number;
   previewUrl: string;

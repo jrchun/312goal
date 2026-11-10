@@ -98,6 +98,9 @@ create table if not exists public.groups (
   created_at  timestamptz not null default now()
 );
 
+-- 주간 목표 없음(null) = "연간 목표만" 그룹: 순위는 각자 올해 목표 대비 %, 52주 칸은 운동한 주 (사용자 결정 2026-11-10, 312_2026)
+alter table public.groups alter column weekly_goal drop not null;
+
 do $$ begin
   alter table public.season_results add constraint season_results_group_fk foreign key (group_id) references public.groups (id) on delete set null;
 exception when duplicate_object then null; end $$;
@@ -580,7 +583,8 @@ returns table (user_id uuid, week date, cnt int, achieved boolean)
 language sql stable as $$
   select m.user_id, w.week::date,
          count(c.id)::int,
-         count(c.id) >= g.weekly_goal
+         -- 연간 목표만인 그룹은 그 주에 한 번이라도 했으면 채운 주
+         count(c.id) >= coalesce(g.weekly_goal, 1)
   from public.group_members m
   join public.groups g on g.id = m.group_id
   cross join generate_series(public.week_start(p_from), public.week_start(p_to), interval '7 days') w(week)
@@ -655,7 +659,9 @@ language sql stable as $$
          ((select d from today) - coalesce(b.last_check_date, b.joined_date))::int as days_silent,
          b.streak_weeks,
          b.recent4_weeks as rank_weeks,
-         rank() over (order by b.recent4_weeks desc, b.season_count desc)::int as rank
+         -- 연간 목표만인 그룹(weekly_goal null): 각자 올해 목표 대비 % 순. 아니면 최근 4주 달성 주 수 순
+         rank() over (order by case when b.weekly_goal is null then b.season_count::numeric / b.season_goal end desc nulls last,
+                               b.recent4_weeks desc, b.season_count desc)::int as rank
   from base b
   order by rank, b.nickname
 $$;

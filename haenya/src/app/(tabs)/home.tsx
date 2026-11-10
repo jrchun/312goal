@@ -19,6 +19,7 @@ import { siteUrl } from '../../lib/invite';
 import { shareCardToKakao } from '../../lib/kakao';
 import { callName } from '../../lib/korean';
 import { useSession } from '../../lib/session';
+import { isAnnual, paceSentence, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow, WeekSummary } from '../../lib/types';
 import { color, layout, space, type } from '../../theme';
@@ -68,10 +69,17 @@ export default function Home() {
   const today = checkDate();
   const me = rows?.find((r) => r.is_me);
   const doneToday = me?.last_check_date === today;
+  // 연간 목표만인 그룹(주간 목표 없음): 큰 숫자는 올해 누적/목표, 순위는 목표 대비 % (DB rank)
+  const annual = isAnnual(group?.weekly_goal);
   const goal = me?.weekly_goal ?? group?.weekly_goal ?? 3;
   const count = me?.week_count ?? 0;
   const left = Math.max(0, goal - count);
-  const weekly = [...(rows ?? [])].sort((a, b) => b.week_count - a.week_count || a.nickname.localeCompare(b.nickname, 'ko'));
+  const pace = me ? seasonPace(me.season_count, me.season_goal, today) : null;
+  const weekly = [...(rows ?? [])].sort(
+    annual
+      ? (a, b) => a.rank - b.rank || a.nickname.localeCompare(b.nickname, 'ko')
+      : (a, b) => b.week_count - a.week_count || a.nickname.localeCompare(b.nickname, 'ko'),
+  );
   // 순위는 최대 4줄. 내가 4등 밖이면 상위 3명 + 나 (내 자리는 항상 보이게)
   const meIdx = weekly.findIndex((r) => r.is_me);
   // "더 보기"는 그룹 탭(4주 기준)으로 가지 않고 여기서 펼친다 → 같은 이번 주 기준 순위 (사용자 확정 2026-11-10)
@@ -150,8 +158,9 @@ export default function Home() {
         groupName: group.name,
         weekLabel: weekLabel(),
         callName: callName(r.nickname),
-        weekCount: r.week_count,
-        weeklyGoal: r.weekly_goal,
+        // 연간 목표만이면 카드 숫자는 올해 누적/목표
+        weekCount: r.weekly_goal == null ? r.season_count : r.week_count,
+        weeklyGoal: r.weekly_goal ?? r.season_goal,
         daysSilent: days,
       },
       `${callName(r.nickname)} 했냐?`,
@@ -188,7 +197,7 @@ export default function Home() {
         groupName: group.name,
         weekLabel: `${summary.week.slice(0, 4)} · W${String(isoWeek(summary.week)).padStart(2, '0')} 결산`,
         groupTotal: summary.group_total,
-        groupTarget: summary.group_target,
+        groupTarget: summary.group_target ?? 0,
         achievedMembers: summary.achieved_members,
         nudgeCount: summary.nudge_count,
       });
@@ -205,9 +214,11 @@ export default function Home() {
         <View style={styles.summary}>
           <Text style={[type.label, { color: color.cream }]}>지난주 결산</Text>
           <Text style={[type.sentence, { color: color.cream }]}>
-            그룹 {summary.group_total}/{summary.group_target}회 · {summary.achieved_members}명 달성 · {summary.nudge_count}번 찔렀다.
+            {summary.group_target == null
+              ? `그룹 ${summary.group_total}회 · ${summary.achieved_members}명 운동 · ${summary.nudge_count}번 찔렀다.`
+              : `그룹 ${summary.group_total}/${summary.group_target}회 · ${summary.achieved_members}명 달성 · ${summary.nudge_count}번 찔렀다.`}
           </Text>
-          <Button variant="poke" label="주간 결산 카드" arrow onPress={weeklyCard} busy={cardBusy} />
+          {summary.group_target != null ? <Button variant="poke" label="주간 결산 카드" arrow onPress={weeklyCard} busy={cardBusy} /> : null}
         </View>
       ) : null}
       <TopBar left={group?.name ?? ''} right={`${today.slice(0, 4)} 시즌 · W${String(isoWeek(today)).padStart(2, '0')}`} />
@@ -216,17 +227,22 @@ export default function Home() {
       </Text>
       <Rule />
 
-      <View style={styles.progressRow}>
+      {/* 연간 목표만이면 숫자가 세 자리라 문장을 아래로 (한 줄에 다 안 들어감) */}
+      <View style={[styles.progressRow, annual && styles.progressCol]}>
         <Text style={[type.progress, { color: color.black }]}>
-          {rows ? count : ' '}
-          <Text style={{ color: color.gray }}>/{goal}</Text>
+          {rows ? (annual ? me?.season_count ?? 0 : count) : ' '}
+          <Text style={{ color: color.gray, ...(annual ? { fontSize: 56 } : null) }}>/{annual ? me?.season_goal ?? '' : goal}</Text>
         </Text>
         <Text style={[type.sentence, styles.sentence]}>
-          {me ? `${me.nickname}.\n이번 주\n${left > 0 ? `아직 ${countWord(left)} 번.` : '끝. 더 해도 된다.'}` : ''}
+          {me && annual && pace
+            ? `${me.nickname}. 연도 대비 ${paceSentence(pace.diff)}`
+            : me ? `${me.nickname}.\n이번 주\n${left > 0 ? `아직 ${countWord(left)} 번.` : '끝. 더 해도 된다.'}` : ''}
         </Text>
       </View>
       <Text style={type.caption}>
-        {me ? `시즌 누적 ${me.season_count} / ${me.season_goal} · 최근 4주 달성 ${me.rank_weeks}주` : ' '}
+        {me && annual && pace
+          ? `올해 목표의 ${pace.pct}% · 이번 주 ${me.week_count}회`
+          : me ? `시즌 누적 ${me.season_count} / ${me.season_goal} · 최근 4주 달성 ${me.rank_weeks}주` : ' '}
       </Text>
 
       <View style={styles.cta}>
@@ -238,14 +254,14 @@ export default function Home() {
       </View>
 
       <View style={styles.sectionHead}>
-        <Label>이번 주 순위</Label>
+        <Label>{annual ? '올해 순위 · 목표 대비' : '이번 주 순위'}</Label>
       </View>
       <View style={styles.list}>
         {shown.map((r) => (
           <RankRow
             key={r.user_id}
             name={r.nickname}
-            value={String(r.week_count)}
+            value={annual ? `${seasonPace(r.season_count, r.season_goal, today).pct}%` : String(r.week_count)}
             isMe={r.is_me}
             daysSilent={r.days_silent}
             compact
@@ -288,6 +304,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   headline: { color: color.red, paddingTop: space(2), paddingBottom: space(2) },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(3) },
+  progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: space(1), paddingBottom: space(1) },
   sentence: { color: color.black, flexShrink: 1 },
   cta: { paddingVertical: space(5) },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: layout.minTouch },

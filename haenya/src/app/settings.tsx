@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
-import { Field, Label, Notice, PinField, Stepper } from '../components/Form';
+import { Check, Field, Label, Notice, PinField, Stepper } from '../components/Form';
 import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { deleteMyAccount, leaveGroup } from '../lib/account';
@@ -29,7 +29,7 @@ export default function Settings() {
   const [members, setMembers] = useState<RestoreCandidate[]>([]);
   const [myGoal, setMyGoal] = useState(m?.season_goal ?? 150);
   const [gName, setGName] = useState(g?.name ?? '');
-  const [gWeekly, setGWeekly] = useState(g?.weekly_goal ?? 3);
+  const [gWeekly, setGWeekly] = useState<number | null>(g ? g.weekly_goal : 3);
   const [gSeason, setGSeason] = useState(g?.season_goal ?? 150);
   const [msg, setMsg] = useState<Record<string, Msg>>({});
   const [confirm, setConfirm] = useState<'leave' | 'delete' | null>(null);
@@ -144,7 +144,12 @@ export default function Settings() {
         <Section>
           <Label>그룹 설정 · 그룹장만</Label>
           <Field label="그룹 이름" value={gName} onChangeText={setGName} maxLength={20} />
-          <Stepper label="주간 목표 (모두 같이)" value={gWeekly} onChange={setGWeekly} min={1} max={7} unit="회" />
+          <Check checked={gWeekly == null} onToggle={() => setGWeekly(gWeekly == null ? 3 : null)}>
+            주간 목표 없음 · 각자 올해 목표만
+          </Check>
+          {gWeekly != null ? (
+            <Stepper label="주간 목표 (모두 같이)" value={gWeekly} onChange={setGWeekly} min={1} max={7} unit="회" />
+          ) : null}
           <Stepper label="새 멤버 기본 올해 목표" value={gSeason} onChange={setGSeason} min={10} max={366} step={10} unit="회" />
           <Notice tone={msg.group?.tone}>{msg.group?.text}</Notice>
           {gName.trim() !== g.name || gWeekly !== g.weekly_goal || gSeason !== g.season_goal ? (

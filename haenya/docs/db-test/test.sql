@@ -238,3 +238,10 @@ reset role;
 select is_placeholder as "자리 표시 해제(f)" from profiles where id = md5('ph1')::uuid;
 set role anon;
 select claim_account(md5('ph1')::uuid, :'dcode') is null as "숫자 정한 뒤 다시(null)";
+
+\echo '== 20. 연간 목표만 그룹 (주간 목표 없음)'
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select pg_temp.try(format('update groups set weekly_goal = null where id = %L', :'dgid')) as "그룹장이 주간 목표 없앰";
+select nickname, season_count, season_goal, weekly_goal, rank from group_week_board(:'dgid') order by rank, nickname;
+select week_target is null as "초대 미리보기 목표 없음" from get_invite_preview(:'dcode');
+select group_target is null as "결산 목표 없음" from group_week_summary(:'dgid');

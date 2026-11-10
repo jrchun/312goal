@@ -16,6 +16,7 @@ import { useCache } from '../../lib/cache';
 import { thumbOf } from '../../lib/photos';
 import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
+import { isAnnual, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
 import { color, font, layout, line, space, type } from '../../theme';
 
@@ -75,6 +76,7 @@ export default function Group() {
   };
 
   const year = checkDate().slice(0, 4);
+  const annual = isAnnual(group?.weekly_goal);
 
   const rankList = (
     <View>
@@ -83,14 +85,16 @@ export default function Group() {
           key={r.user_id}
           rank={r.rank}
           name={r.nickname}
-          value={`${r.rank_weeks}주`}
+          value={annual ? `${seasonPace(r.season_count, r.season_goal).pct}%` : `${r.rank_weeks}주`}
           sub={`${r.season_count} / ${r.season_goal}`}
           isMe={r.is_me}
           compact
         />
       ))}
       <Rule weight="row" />
-      <Text style={[type.caption, styles.note]}>끝난 4주 중 주 {group?.weekly_goal ?? 3}회를 채운 주. 같으면 시즌 누적 순.</Text>
+      <Text style={[type.caption, styles.note]}>
+        {annual ? '각자 올해 목표 대비. 같으면 누적 순.' : `끝난 4주 중 주 ${group?.weekly_goal ?? 3}회를 채운 주. 같으면 시즌 누적 순.`}
+      </Text>
     </View>
   );
   const items = photos.map((p) => ({
@@ -106,7 +110,7 @@ export default function Group() {
   return (
     <Screen>
       <View style={styles.top}>
-        <Text style={[type.caption, { color: color.black }]}>{`${year} 시즌 · ${board.length || ''}명 · 주 ${group?.weekly_goal ?? 3}회`}</Text>
+        <Text style={[type.caption, { color: color.black }]}>{`${year} 시즌 · ${board.length || ''}명 · ${annual ? '연간 목표' : `주 ${group?.weekly_goal ?? 3}회`}`}</Text>
         <Button variant="text" label="초대 →" onPress={invite} />
       </View>
       <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{group?.name ?? ''}</Text>

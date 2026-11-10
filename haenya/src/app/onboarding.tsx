@@ -30,7 +30,7 @@ export default function Onboarding() {
       weekLabel: `W${String(isoWeek(today)).padStart(2, '0')}`,
       nickname: displayName(s.profile),
       weekCount: 0,
-      weeklyGoal: g.weekly_goal,
+      weeklyGoal: g.weekly_goal ?? s.membership?.season_goal ?? g.season_goal,
       memo: '0번째 · 연습',
       timeLabel: stickerTime(new Date()),
     })

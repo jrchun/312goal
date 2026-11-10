@@ -72,7 +72,7 @@ export default function Join() {
 
   const invalid = preview === null;
   const inviter = preview?.owner_nickname;
-  const pct = preview && preview.week_target > 0 ? Math.min(1, preview.week_total / preview.week_target) : 0;
+  const pct = preview && preview.week_target ? Math.min(1, preview.week_total / preview.week_target) : 0;
 
   return (
     <Screen>
@@ -95,13 +95,13 @@ export default function Join() {
           <View style={styles.cardRow}>
             <Text style={[type.rankName, styles.groupName]} numberOfLines={1}>{preview.group_name}</Text>
             <Text style={[type.caption, { color: color.black }]}>
-              주 {preview.weekly_goal}회 · {preview.season_year} 시즌
+              {preview.weekly_goal == null ? '연간 목표' : `주 ${preview.weekly_goal}회`} · {preview.season_year} 시즌
             </Text>
           </View>
           <View style={styles.cardRow}>
             <Text style={[type.caption, { color: color.black }]}>이번 주 그룹 합계 · {preview.member_count}명</Text>
             <Text style={[type.button, { color: color.black }]}>
-              {preview.week_total} / {preview.week_target}회
+              {preview.week_target == null ? `${preview.week_total}회` : `${preview.week_total} / ${preview.week_target}회`}
             </Text>
           </View>
           <View style={styles.bar}>

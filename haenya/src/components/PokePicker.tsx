@@ -41,7 +41,7 @@ export function PokePicker({
                 <View style={styles.left}>
                   <Text style={{ ...font.display, fontSize: 26, color: color.black }}>{r.nickname}</Text>
                   <Text style={type.caption}>
-                    이번 주 {r.week_count}/{r.weekly_goal}
+                    {r.weekly_goal == null ? `이번 주 ${r.week_count}회 · 올해 ${r.season_count}/${r.season_goal}` : `이번 주 ${r.week_count}/${r.weekly_goal}`}
                     {r.days_silent >= 2 ? ` · ${r.days_silent}일째 무소식` : ''}
                   </Text>
                 </View>

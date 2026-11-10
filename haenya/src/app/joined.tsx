@@ -48,7 +48,7 @@ export default function Joined() {
 
   return (
     <Screen>
-      <TopBar left={m.group.name} right={`주 ${m.group.weekly_goal}회`} />
+      <TopBar left={m.group.name} right={m.group.weekly_goal == null ? '연간 목표' : `주 ${m.group.weekly_goal}회`} />
       <Text style={styles.title} adjustsFontSizeToFit numberOfLines={2}>들어왔다.</Text>
       <Rule />
       <Text style={[type.sentence, styles.sentence]}>

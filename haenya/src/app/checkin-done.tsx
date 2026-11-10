@@ -15,6 +15,7 @@ import { ordinalWord } from '../lib/korean';
 import { displayName, useSession } from '../lib/session';
 import { shareImage } from '../lib/share';
 import { color, space, type } from '../theme';
+import { paceSentence, seasonPace } from '../lib/season';
 
 /**
  * 인증 완료 — 올린 사진이 곧 공유 카드. 바로 아래 카톡 던지기와 스토리 저장. (가이드라인 07 · 인증 완료)
@@ -34,9 +35,10 @@ export default function CheckinDone() {
       groupName: membership.group.name,
       weekLabel: `W${String(isoWeek(r.check_date)).padStart(2, '0')}`,
       nickname: displayName(profile),
-      weekCount: r.week_count,
-      weeklyGoal: r.weekly_goal,
-      memo: r.counted ? `이번 주 ${ordinalWord(r.week_count)} 번째` : '오늘 한 장 더',
+      // 연간 목표만인 그룹: 스티커 숫자는 올해 누적/목표
+      weekCount: r.weekly_goal == null ? r.season_count : r.week_count,
+      weeklyGoal: r.weekly_goal ?? r.season_goal,
+      memo: r.counted ? (r.weekly_goal == null ? `올해 ${r.season_count}번째` : `이번 주 ${ordinalWord(r.week_count)} 번째`) : '오늘 한 장 더',
       timeLabel: r.takenAt ? stickerTime(r.takenAt) : '날짜 미확인',
     };
   }, [r, membership, profile?.nickname]);
@@ -55,11 +57,14 @@ export default function CheckinDone() {
 
   if (!r) return <Redirect href="/home" />;
 
-  const left = Math.max(0, r.weekly_goal - r.week_count);
+  const annual = r.weekly_goal == null;
+  const left = annual ? Math.max(0, r.season_goal - r.season_count) : Math.max(0, (r.weekly_goal ?? 0) - r.week_count);
   const title = r.counted ? '했다.' : '이미 했다.';
-  const sentence = r.counted
-    ? left > 0 ? `${countWord(left)} 번 남았다.` : '이번 주 끝.'
-    : '오늘은 이미 했다. 사진만 저장할게.';
+  const sentence = !r.counted
+    ? '오늘은 이미 했다. 사진만 저장할게.'
+    : annual
+      ? left > 0 ? `올해 ${left}번 남았다. ${paceSentence(seasonPace(r.season_count, r.season_goal, r.check_date).diff)}` : '올해 목표 끝. 더 해도 된다.'
+      : left > 0 ? `${countWord(left)} 번 남았다.` : '이번 주 끝.';
 
   const toKakao = async () => {
     if (!input) return;
@@ -70,7 +75,7 @@ export default function CheckinDone() {
       await shareCardToKakao({
         image: square,
         title: `${input.nickname} 했다.`,
-        description: `${input.groupName} · 이번 주 ${input.weekCount}/${input.weeklyGoal}`,
+        description: `${input.groupName} · ${annual ? '올해' : '이번 주'} ${input.weekCount}/${input.weeklyGoal}`,
         link: `${siteUrl()}/home`,
         buttonTitle: '나도 인증하러 가기',
       });

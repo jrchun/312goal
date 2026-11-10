@@ -12,7 +12,7 @@ export type Group = {
   id: string;
   name: string;
   invite_code: string;
-  weekly_goal: number;
+  weekly_goal: number | null;
   season_goal: number;
   owner_id: string;
 };
@@ -28,9 +28,9 @@ export type InvitePreview = {
   group_name: string;
   owner_nickname: string | null;
   member_count: number;
-  weekly_goal: number;
+  weekly_goal: number | null;
   week_total: number;
-  week_target: number;
+  week_target: number | null;
   season_year: number;
   is_full: boolean;
 };
@@ -42,7 +42,7 @@ export type BoardRow = {
   avatar_url: string | null;
   is_me: boolean;
   week_count: number;
-  weekly_goal: number;
+  weekly_goal: number | null;
   season_count: number;
   season_goal: number;
   last_check_date: string | null;
@@ -86,4 +86,4 @@ export type PinStatus = { has_pin: boolean; is_temp: boolean };
 export type RestoreCandidate = { user_id: string; family_name: string | null; given_name: string | null; display_name: string; can_pin: boolean; claimable?: boolean };
 
 /** group_week_summary() */
-export type WeekSummary = { week: string; group_total: number; group_target: number; achieved_members: number; member_count: number; nudge_count: number };
+export type WeekSummary = { week: string; group_total: number; group_target: number | null; achieved_members: number; member_count: number; nudge_count: number };
