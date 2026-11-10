@@ -27,6 +27,7 @@ import { color, space, type } from '../../theme';
 export default function Home() {
   const { membership, session } = useSession();
   const [poked, setPoked] = useState<Record<string, boolean>>({});
+  const [pokedAll, setPokedAll] = useState(false);
   const [picker, setPicker] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'info' | 'error' } | null>(null);
   const group = membership?.group;
@@ -77,6 +78,52 @@ export default function Home() {
   // 찌를 수 있는 사람: 오늘 아직 인증 안 한 멤버 (내가 직접 고른다)
   const notToday = weekly.filter((r) => !r.is_me && r.last_check_date !== today);
 
+  // 오늘 내가 이미 찌른 사람 (DB 기준이라 새로고침해도 "찔렀다"가 유지된다)
+  const loadPoked = useCallback(async () => {
+    if (!group) return;
+    const { data } = await supabase.rpc('my_nudges_today', { p_group_id: group.id });
+    const d = data as { to: string[]; all: boolean } | null;
+    if (!d) return;
+    setPoked(Object.fromEntries(d.to.map((id) => [id, true])));
+    setPokedAll(d.all);
+  }, [group]);
+
+  const openPicker = () => {
+    setPicker(true);
+    loadPoked();
+  };
+
+  const weekLabel = () => `W${String(isoWeek(today)).padStart(2, '0')} · ${weekdayLabel()}`;
+
+  /** 재촉 카드를 카톡으로. 안 되면 문장 + 링크 공유 */
+  const shareNudge = async (card: Parameters<typeof makeNudgeCard>[0], title: string, description: string, done: string) => {
+    try {
+      const image = await makeNudgeCard(card);
+      await shareCardToKakao({ image, title, description, link: `${siteUrl()}/home`, buttonTitle: '눌러서 인증하기' });
+      setNotice({ text: done, tone: 'info' });
+      setPicker(false);
+      return;
+    } catch (e) {
+      console.warn('nudge card share failed', e);
+    }
+    const text = `${title} ${description} ${siteUrl()}/home`;
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'share' in navigator) {
+        await navigator.share({ text });
+      } else if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(text);
+        setNotice({ text: '찔렀다. 단톡방에 붙여넣어.', tone: 'info' });
+        return;
+      } else {
+        await Share.share({ message: text });
+      }
+    } catch {
+      // 공유 창을 닫아도 찌르기 기록은 남았다
+    }
+    setNotice({ text: done, tone: 'info' });
+  };
+
+  // 한 사람 찌르기: 같은 사람에게 하루 1번 (DB send_nudge). 다른 사람은 따로 찌를 수 있다
   const poke = async (r: BoardRow) => {
     if (!group) return;
     setNotice(null);
@@ -90,45 +137,40 @@ export default function Home() {
       setNotice({ text: errorMessage(error), tone: 'info' });
       return;
     }
-    // 재촉 카드(빨강, "○○야 했냐?")를 카톡으로. 안 되면 문장 + 링크 공유
     const days = r.days_silent;
-    try {
-      const image = await makeNudgeCard({
+    await shareNudge(
+      {
         groupName: group.name,
-        weekLabel: `W${String(isoWeek(today)).padStart(2, '0')} · ${weekdayLabel()}`,
+        weekLabel: weekLabel(),
         callName: callName(r.nickname),
         weekCount: r.week_count,
         weeklyGoal: r.weekly_goal,
         daysSilent: days,
-      });
-      await shareCardToKakao({
-        image,
-        title: `${callName(r.nickname)} 했냐?`,
-        description: days > 0 ? `${days}일째 무소식. 다들 기다리는 중.` : '다들 기다리는 중.',
-        link: `${siteUrl()}/home`,
-        buttonTitle: '눌러서 인증하기',
-      });
-      setNotice({ text: `${r.nickname} 찔렀다.`, tone: 'info' });
-      setPicker(false);
+      },
+      `${callName(r.nickname)} 했냐?`,
+      days > 0 ? `${days}일째 무소식. 다들 기다리는 중.` : '다들 기다리는 중.',
+      `${r.nickname} 찔렀다.`,
+    );
+  };
+
+  // 다 같이 찌르기 ("얘들아 했냐?"): 단톡방용, 하루 1번 (DB send_group_nudge)
+  const pokeAll = async () => {
+    if (!group) return;
+    setNotice(null);
+    const { data, error } = await supabase.rpc('send_group_nudge', { p_group_id: group.id });
+    if (error) {
+      if (error.message === 'ALREADY_NUDGED') setPokedAll(true);
+      setNotice({ text: errorMessage(error), tone: error.message === 'ALREADY_NUDGED' ? 'info' : 'error' });
       return;
-    } catch (e) {
-      console.warn('nudge card share failed', e);
     }
-    const text = `${callName(r.nickname)} 했냐? 다들 기다리는 중. ${siteUrl()}/home`;
-    try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'share' in navigator) {
-        await navigator.share({ text });
-      } else if (Platform.OS === 'web') {
-        await navigator.clipboard.writeText(text);
-        setNotice({ text: '찔렀다. 단톡방에 붙여넣어.', tone: 'info' });
-        return;
-      } else {
-        await Share.share({ message: text });
-      }
-      setNotice({ text: `${r.nickname} 찔렀다.`, tone: 'info' });
-    } catch {
-      setNotice({ text: `${r.nickname} 찔렀다.`, tone: 'info' });
-    }
+    setPokedAll(true);
+    const names = ((data as { nickname: string }[] | null) ?? []).map((x) => x.nickname);
+    await shareNudge(
+      { groupName: group.name, weekLabel: weekLabel(), callName: '얘들아', weekCount: 0, weeklyGoal: 0, daysSilent: 0, group: { names } },
+      '얘들아 했냐?',
+      `오늘 아직 ${names.length}명. ${names.join(', ')}. 다들 기다리는 중.`,
+      '다 같이 찔렀다.',
+    );
   };
 
   const weeklyCard = async () => {
@@ -214,7 +256,7 @@ export default function Home() {
       {weekly.length > 1 ? (
         <View style={styles.poke}>
           {notToday.length ? (
-            <Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={() => setPicker(true)} />
+            <Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={openPicker} />
           ) : (
             <Text style={[type.sentence, { color: color.black }]}>오늘은 다 했다.</Text>
           )}
@@ -224,7 +266,15 @@ export default function Home() {
         {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       </View>
       <SaveImageSheet uri={sheet} onClose={() => setSheet(null)} />
-      <PokePicker visible={picker} members={notToday} poked={poked} onPoke={poke} onClose={() => setPicker(false)} />
+      <PokePicker
+        visible={picker}
+        members={notToday}
+        poked={poked}
+        pokedAll={pokedAll}
+        onPoke={poke}
+        onPokeAll={pokeAll}
+        onClose={() => setPicker(false)}
+      />
     </Screen>
   );
 }

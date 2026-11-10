@@ -5,15 +5,18 @@ import { Button } from './Button';
 
 /**
  * 누구 찌를까? — 오늘 아직 인증 안 한 멤버 중에서 직접 고른다 (사용자 결정 2026-11-10: 무소식 기준 대신 직접 선택).
- * 같은 사람은 하루 1번(DB send_nudge). 이미 찌른 사람은 "찔렀다"로 막힌다.
+ * 같은 사람은 하루 1번(DB send_nudge). 오늘 이미 찌른 사람만 "찔렀다"로 막히고, 다른 사람은 따로 찌를 수 있다.
+ * 맨 위 "얘들아": 오늘 안 한 사람 전부를 한 장으로 (단톡방용, 하루 1번, DB send_group_nudge).
  */
 export function PokePicker({
-  visible, members, poked, onPoke, onClose,
+  visible, members, poked, pokedAll, onPoke, onPokeAll, onClose,
 }: {
   visible: boolean;
   members: BoardRow[];
   poked: Record<string, boolean>;
+  pokedAll: boolean;
   onPoke: (r: BoardRow) => void;
+  onPokeAll: () => void;
   onClose: () => void;
 }) {
   return (
@@ -24,6 +27,15 @@ export function PokePicker({
           <View style={styles.rule} />
           <Text style={[type.caption, styles.caption]}>오늘 아직 안 한 사람. 한 사람에게 하루 한 번.</Text>
           <ScrollView style={styles.list}>
+            {members.length > 1 ? (
+              <View style={styles.row}>
+                <View style={styles.left}>
+                  <Text style={{ ...font.display, fontSize: 26, color: color.black }}>얘들아</Text>
+                  <Text style={type.caption}>{members.length}명 한 번에 · 단톡방용</Text>
+                </View>
+                <Button variant="poke" label={pokedAll ? '찔렀다' : '다 찌르기'} disabled={pokedAll} onPress={onPokeAll} />
+              </View>
+            ) : null}
             {members.map((r) => (
               <View key={r.user_id} style={styles.row}>
                 <View style={styles.left}>

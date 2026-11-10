@@ -158,6 +158,16 @@ create table if not exists public.nudges (
 );
 create index if not exists nudges_group_date on public.nudges (group_id, nudge_date);
 
+-- 다 같이 찌르기("얘들아 했냐?"): 단톡방용. 한 사람이 그룹마다 하루 1회. 사람별 찌르기와 따로 센다.
+create table if not exists public.group_nudges (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  from_user  uuid not null references public.profiles (id) on delete cascade,
+  nudge_date date not null default public.haenya_today(),
+  created_at timestamptz not null default now(),
+  unique (group_id, from_user, nudge_date)
+);
+
 -- 앱 단계(푸시 알림)용 자리
 create table if not exists public.push_tokens (
   user_id    uuid not null references public.profiles (id) on delete cascade,
@@ -252,6 +262,7 @@ alter table public.seasons       enable row level security;
 alter table public.checkins      enable row level security;
 alter table public.reactions     enable row level security;
 alter table public.nudges        enable row level security;
+alter table public.group_nudges  enable row level security;  -- 정책 없음 = 함수로만
 alter table public.push_tokens   enable row level security;
 alter table public.user_pins     enable row level security;  -- 정책 없음 = 앱에서 직접 접근 불가
 alter table public.transfer_tokens enable row level security; -- 정책 없음 = 함수로만
@@ -511,6 +522,46 @@ begin
   from public.group_week_board(p_group_id) b
   where b.user_id = p_to_user;
 end $$;
+
+-- 다 같이 찌르기: 오늘 아직 안 한 멤버(나 빼고) 이름을 돌려준다
+create or replace function public.send_group_nudge(p_group_id uuid)
+returns table (nickname text, week_count int, weekly_goal int, days_silent int)
+language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+declare
+  uid uuid := auth.uid();
+  d date := public.haenya_today();
+begin
+  if uid is null then raise exception 'NOT_LOGGED_IN'; end if;
+  if not public.is_group_member(p_group_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if not exists (
+    select 1 from public.group_week_board(p_group_id) b
+    where b.user_id <> uid and b.last_check_date is distinct from d
+  ) then raise exception 'NOBODY_TO_NUDGE'; end if;
+
+  insert into public.group_nudges (group_id, from_user, nudge_date)
+  values (p_group_id, uid, d)
+  on conflict (group_id, from_user, nudge_date) do nothing;
+  if not found then raise exception 'ALREADY_NUDGED' using hint = '오늘은 이미 찔렀다.'; end if;
+
+  return query
+  select b.nickname, b.week_count, b.weekly_goal, b.days_silent
+  from public.group_week_board(p_group_id) b
+  where b.user_id <> uid and b.last_check_date is distinct from d
+  order by b.week_count, b.nickname;
+end $$;
+
+-- 오늘 내가 이미 찌른 사람들 + 다 같이 찌르기 했는지 (찌르기 창에서 "찔렀다" 표시용)
+create or replace function public.my_nudges_today(p_group_id uuid)
+returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'to', coalesce((select jsonb_agg(n.to_user) from public.nudges n
+                    where n.group_id = p_group_id and n.from_user = auth.uid() and n.nudge_date = public.haenya_today()), '[]'::jsonb),
+    'all', exists (select 1 from public.group_nudges g
+                   where g.group_id = p_group_id and g.from_user = auth.uid() and g.nudge_date = public.haenya_today())
+  )
+$$;
 
 -- ---------------------------------------------------------------------
 -- 9. 집계 (화면용)
@@ -920,6 +971,8 @@ grant execute on function
   public.join_group(text),
   public.submit_checkin(uuid, text, timestamptz),
   public.send_nudge(uuid, uuid),
+  public.send_group_nudge(uuid),
+  public.my_nudges_today(uuid),
   public.member_weeks(uuid, date, date),
   public.group_week_board(uuid),
   public.my_stats(uuid),

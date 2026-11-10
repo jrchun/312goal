@@ -55,6 +55,11 @@ select * from send_nudge(:'gid', pg_temp.uid('c'));
 select pg_temp.try(format('select send_nudge(%L, %L)', :'gid', pg_temp.uid('c'))) as "같은 날 또";
 select pg_temp.try(format('select send_nudge(%L, %L)', :'gid', pg_temp.uid('a'))) as "자기 자신";
 select pg_temp.try(format('select send_nudge(%L, %L)', :'gid', pg_temp.uid('m'))) as "그룹 밖 사람";
+select * from send_nudge(:'gid', pg_temp.uid('b')) as "다른 사람은 찌를 수 있음";
+select my_nudges_today(:'gid') as "오늘 찌른 사람";
+select * from send_group_nudge(:'gid') as "다 같이 찌르기(오늘 안 한 사람만)";
+select pg_temp.try(format('select send_group_nudge(%L)', :'gid')) as "다 같이 또";
+select my_nudges_today(:'gid') ->> 'all' as "다 같이 했음(true 기대)";
 
 \echo '== 6. 권한 (RLS)'
 reset role;

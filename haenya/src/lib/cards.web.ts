@@ -22,7 +22,9 @@ export type DidCardInput = {
 export type NudgeCardInput = {
   groupName: string;
   weekLabel: string; // "W46 · 월요일 밤"
-  callName: string; // "민지야"
+  callName: string; // "민지야" / 다 같이면 "얘들아"
+  /** 다 같이 찌르기: 큰 숫자 자리에 "N명", 옆에 "오늘 아직 안 했다." + 이름들 */
+  group?: { names: string[] };
   weekCount: number;
   weeklyGoal: number;
   daysSilent: number;
@@ -163,7 +165,7 @@ export const makeDidSquareCard = (i: DidCardInput) => drawDid(i, 1200, 1200);
 export async function makeNudgeCard(i: NudgeCardInput): Promise<Blob> {
   const W = 1200;
   const H = 1200;
-  await ensureFonts(`${i.callName}했냐?고0123456789/ 일째무소식다들기다리는중.${i.groupName}${i.weekLabel}`);
+  await ensureFonts(`${i.callName}했냐?고0123456789/명 일째무소식다들기다리는중.오늘아직안했외·${i.groupName}${i.weekLabel}${i.group?.names.join('') ?? ''}`);
   const { c, ctx } = canvasOf(W, H);
   const m = 72;
   ctx.fillStyle = color.red;
@@ -192,13 +194,28 @@ export async function makeNudgeCard(i: NudgeCardInput): Promise<Blob> {
   // n/목표 + 문장
   const y = m + 70 + lh * 2 + 150;
   ctx.font = `120px ${DISPLAY}`;
-  const cnt = `${i.weekCount}/${i.weeklyGoal}`;
+  const cnt = i.group ? `${i.group.names.length}명` : `${i.weekCount}/${i.weeklyGoal}`;
   ctx.fillText(cnt, m, y);
   const cw = ctx.measureText(cnt).width;
   ctx.font = `800 40px ${GOTHIC}`;
-  const first = i.daysSilent > 0 ? `${i.daysSilent}일째 무소식.` : '이번 주 아직이다.';
-  ctx.fillText(first, m + cw + 36, y - 58);
-  ctx.fillText('다들 기다리는 중.', m + cw + 36, y - 6);
+  const x = m + cw + 36;
+  if (i.group) {
+    // 다 같이: "오늘 아직." + 이름들 (길면 "외 N명")
+    ctx.fillText('오늘 아직 안 했다.', x, y - 58);
+    const names = i.group.names;
+    const maxW = W - m - x;
+    let k = names.length;
+    let line = names.join(' · ');
+    while (k > 1 && ctx.measureText(line).width > maxW) {
+      k -= 1;
+      line = `${names.slice(0, k).join(' · ')} 외 ${names.length - k}명`;
+    }
+    ctx.fillText(line, x, y - 6);
+  } else {
+    const first = i.daysSilent > 0 ? `${i.daysSilent}일째 무소식.` : '이번 주 아직이다.';
+    ctx.fillText(first, x, y - 58);
+    ctx.fillText('다들 기다리는 중.', x, y - 6);
+  }
 
   // 아래 띠: "했냐고." 한 번 더 재촉 (사용자 요청 2026-11-10. 카톡 메시지 아래에 했냐 아이콘·이름이 따로 붙고,
   // "눌러서 인증하기"도 카톡 버튼이 따로 있어서 뺐다)

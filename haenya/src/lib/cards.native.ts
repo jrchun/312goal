@@ -5,6 +5,8 @@ export type DidCardInput = {
 };
 export type NudgeCardInput = {
   groupName: string; weekLabel: string; callName: string; weekCount: number; weeklyGoal: number; daysSilent: number;
+  /** 다 같이 찌르기: 큰 숫자 자리에 "N명", 옆 두 줄에 "오늘 아직." + 이름들 */
+  group?: { names: string[] };
 };
 const notYet = async (): Promise<Blob> => {
   throw new Error('앱 공유 카드는 2단계에서 지원');
