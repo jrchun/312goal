@@ -163,7 +163,7 @@ export const makeDidSquareCard = (i: DidCardInput) => drawDid(i, 1200, 1200);
 export async function makeNudgeCard(i: NudgeCardInput): Promise<Blob> {
   const W = 1200;
   const H = 1200;
-  await ensureFonts(`${i.callName}했냐?0123456789/ 일째무소식다들기다리는중.${i.groupName}${i.weekLabel}`);
+  await ensureFonts(`${i.callName}했냐?고0123456789/ 일째무소식다들기다리는중.${i.groupName}${i.weekLabel}`);
   const { c, ctx } = canvasOf(W, H);
   const m = 72;
   ctx.fillStyle = color.red;
@@ -200,13 +200,14 @@ export async function makeNudgeCard(i: NudgeCardInput): Promise<Blob> {
   ctx.fillText(first, m + cw + 36, y - 58);
   ctx.fillText('다들 기다리는 중.', m + cw + 36, y - 6);
 
-  // 아래 띠: 워드마크만 (카톡 메시지에 "눌러서 인증하기" 버튼이 따로 있어서 문구는 뺐다 — 사용자 요청 2026-11-10)
+  // 아래 띠: "했냐고." 한 번 더 재촉 (사용자 요청 2026-11-10. 카톡 메시지 아래에 했냐 아이콘·이름이 따로 붙고,
+  // "눌러서 인증하기"도 카톡 버튼이 따로 있어서 뺐다)
   const bandH = 170;
   ctx.fillStyle = color.black;
   ctx.fillRect(0, H - bandH, W, bandH);
   ctx.fillStyle = color.cream;
   ctx.font = `70px ${DISPLAY}`;
-  ctx.fillText('했냐?', m, H - bandH / 2 + 26);
+  ctx.fillText('했냐고.', m, H - bandH / 2 + 26);
   return toBlob(c);
 }
 
