@@ -8,7 +8,7 @@ import { NameCircle } from '../components/NameCircle';
 import { Rule } from '../components/Rule';
 import { Screen } from '../components/Screen';
 import { signInWithKakao } from '../lib/auth';
-import { restoreWithPin } from '../lib/device-auth';
+import { claimAccount, restoreWithPin } from '../lib/device-auth';
 import { errorMessage } from '../lib/errors';
 import { nextRoute, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
@@ -71,12 +71,27 @@ export default function Restore() {
     }
   };
 
+  // 미리 만들어 둔 내 자리(숫자 아직 없음): 들어가서 숫자·약관을 정한다
+  const claim = async () => {
+    if (!picked || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await claimAccount(picked.user_id, code);
+      const state = await s.refresh();
+      router.replace(nextRoute(state, `/join/${code}`) as never);
+    } catch (e) {
+      setError(errorMessage(e));
+      setBusy(false);
+    }
+  };
+
   return (
     <Screen>
       <Text style={styles.title}>{picked ? `${picked.given_name ?? picked.display_name}?` : '너 누구?'}</Text>
       <Rule />
       <Text style={[type.sentence, styles.sentence]}>
-        {picked ? (picked.can_pin ? '숫자 4자리 누르면 바로 들어간다.' : '카카오로 가입한 계정이다.') : code ? '우리 그룹에서 너를 눌러.' : '우리 그룹 초대 링크나 코드를 넣어.'}
+        {picked ? (picked.claimable ? '처음 왔다. 너 맞으면 들어가서 숫자 4자리 정하자.' : picked.can_pin ? '숫자 4자리 누르면 바로 들어간다.' : '카카오로 가입한 계정이다.') : code ? '우리 그룹에서 너를 눌러.' : '우리 그룹 초대 링크나 코드를 넣어.'}
       </Text>
 
       {!code ? (
@@ -87,7 +102,7 @@ export default function Restore() {
         </View>
       ) : picked ? (
         <View style={styles.form}>
-          <NameCircle name={picked.given_name ?? picked.display_name} caption={picked.display_name} kakao={!picked.can_pin} size={112} />
+          <NameCircle name={picked.given_name ?? picked.display_name} caption={picked.display_name} kakao={!picked.can_pin && !picked.claimable} size={112} />
           {picked.can_pin ? (
             <PinField
               label="숫자 4자리"
@@ -120,7 +135,9 @@ export default function Restore() {
       <View style={styles.actions}>
         <Notice tone="error">{error}</Notice>
         {picked ? (
-          picked.can_pin ? (
+          picked.claimable ? (
+            <Button label="나 맞다" onPress={claim} busy={busy} />
+          ) : picked.can_pin ? (
             <>
               {busy ? <Notice>들어가는 중.</Notice> : null}
               <Text style={[type.caption, styles.center]}>숫자를 잊었으면 그룹장한테 초기화해달라고 해.</Text>

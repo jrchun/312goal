@@ -11,8 +11,8 @@ export function MemberCircles({ members, onPick, size = 84 }: { members: Restore
         <View key={m.user_id} style={styles.cell}>
           <NameCircle
             name={m.given_name ?? m.display_name}
-            caption={m.can_pin ? m.display_name : `${m.display_name} · 카카오`}
-            kakao={!m.can_pin}
+            caption={m.can_pin || m.claimable ? m.display_name : `${m.display_name} · 카카오`}
+            kakao={!m.can_pin && !m.claimable}
             size={size}
             onPress={() => onPick(m)}
           />

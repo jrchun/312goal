@@ -216,3 +216,25 @@ select jsonb_array_length(t->'board') as board_rows, jsonb_typeof(t->'checkins')
 select (t->'stats'->>'season_goal') is not null as has_stats, jsonb_array_length(t->'weeks') > 0 as has_weeks, jsonb_typeof(t->'photos') as photos from my_tab(:'dgid') t;
 select set_config('request.jwt.claim.sub', md5('m'), false);
 select jsonb_array_length(t->'board') as "다른 그룹 사람: 보드 0행" , jsonb_array_length(t->'checkins') as "인증 0" from group_tab(:'dgid') t;
+
+\echo '== 19. 미리 만든 자리 → 처음 들어오기, 이전 기록 이어 붙이기'
+reset role;
+insert into auth.users (id, raw_user_meta_data, email) values
+  (md5('ph1')::uuid, '{"name":"호","given_name":"호"}', 'ph1@users.haenya.app');
+update profiles set is_placeholder = true where id = md5('ph1')::uuid;
+insert into group_members (group_id, user_id, season_goal) values (:'dgid', md5('ph1')::uuid, 120);
+insert into season_results (year, display_name, count, goal, source, group_id, user_id)
+  values (extract(year from haenya_today())::int, '호', 108, 120, 'test', :'dgid', md5('ph1')::uuid);
+set role anon; select set_config('request.jwt.claim.sub', '', false);
+select display_name, can_pin, claimable from restore_candidates(:'dcode') order by 1;
+select claim_account(md5('ph1')::uuid, lower(:'dcode')) as "처음 들어오기(이메일)";
+select claim_account(md5('ph1')::uuid, 'WRONG123') is null as "틀린 코드(null)";
+select claim_account(md5('dev2')::uuid, :'dcode') is null as "숫자 있는 사람(null)";
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('ph1'), false);
+select pg_temp.try($$update profiles set is_placeholder = false where id = auth.uid()$$) as "직접 못 바꿈(ERR)";
+select season_count as "이전 108 + 0", season_goal from group_week_board(:'dgid') where is_me;
+select pg_temp.try($$select set_my_pin('1357')$$) as "숫자 정하기";
+reset role;
+select is_placeholder as "자리 표시 해제(f)" from profiles where id = md5('ph1')::uuid;
+set role anon;
+select claim_account(md5('ph1')::uuid, :'dcode') is null as "숫자 정한 뒤 다시(null)";

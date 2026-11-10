@@ -50,6 +50,9 @@ create table if not exists public.profiles (
 -- 성·이름 따로 (화면·찌르기에서는 이름만 쓴다). nickname = 성+이름 전체
 alter table public.profiles add column if not exists family_name text check (char_length(family_name) between 1 and 5);
 alter table public.profiles add column if not exists given_name  text check (char_length(given_name) between 1 and 10);
+-- 그룹장(또는 운영자)이 미리 만들어 둔 멤버 자리. 숫자 4자리를 아직 안 정했으면 초대 링크에서 "나 맞다"로 처음 들어올 수 있다.
+-- 앱에서 직접 못 바꾼다(아래 컬럼 권한에 없음). set_my_pin 하면 false가 된다.
+alter table public.profiles add column if not exists is_placeholder boolean not null default false;
 
 -- 기기 등록 로그인의 "되찾기" 숫자 4자리. 암호화(bcrypt)해서 저장, 앱에서 직접 읽거나 쓸 수 없다(함수로만)
 create table if not exists public.user_pins (
@@ -485,7 +488,10 @@ begin
          g.weekly_goal,
          (select count(*)::int from public.checkins c
            where c.group_id = p_group_id and c.user_id = uid and c.counted
-             and extract(year from c.check_date) = extract(year from d)),
+             and extract(year from c.check_date) = extract(year from d))
+         + coalesce((select sum(sr.count)::int from public.season_results sr
+                      where sr.group_id = p_group_id and sr.user_id = uid
+                        and sr.year = extract(year from d)), 0),
          gm.season_goal
   from public.groups g
   join public.group_members gm on gm.group_id = g.id and gm.user_id = uid
@@ -626,7 +632,11 @@ language sql stable as $$
            g.weekly_goal,
            (select count(*)::int from public.checkins c, today
              where c.group_id = m.group_id and c.user_id = m.user_id and c.counted
-               and extract(year from c.check_date) = extract(year from today.d)) as season_count,
+               and extract(year from c.check_date) = extract(year from today.d))
+           -- 이전 기록(예: 312goal 2026 누적)을 이어 붙였으면 더한다
+           + coalesce((select sum(sr.count)::int from public.season_results sr, today
+                        where sr.group_id = m.group_id and sr.user_id = m.user_id
+                          and sr.year = extract(year from today.d)), 0) as season_count,
            m.season_goal,
            (select max(c.check_date) from public.checkins c
              where c.group_id = m.group_id and c.user_id = m.user_id and c.counted) as last_check_date,
@@ -835,6 +845,7 @@ begin
   values (auth.uid(), crypt(p_pin, gen_salt('bf', 8)), false, 0, null, now())
   on conflict (user_id) do update
     set pin_hash = excluded.pin_hash, is_temp = false, failed_count = 0, locked_until = null, updated_at = now();
+  update public.profiles set is_placeholder = false where id = auth.uid() and is_placeholder;
 end $$;
 
 create or replace function public.my_pin_status()
@@ -845,18 +856,36 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- 되찾기 화면의 멤버 목록 (초대 코드를 아는 사람만, 로그인 전에도)
+-- claimable: 미리 만들어 둔 자리이고 숫자를 아직 안 정함 → "나 맞다"로 처음 들어온다(claim_account)
+drop function if exists public.restore_candidates(text);
 create or replace function public.restore_candidates(p_code text)
-returns table (user_id uuid, family_name text, given_name text, display_name text, can_pin boolean)
+returns table (user_id uuid, family_name text, given_name text, display_name text, can_pin boolean, claimable boolean)
 language sql stable security definer set search_path = public, auth as $$
   select m.user_id, p.family_name, p.given_name,
          coalesce(p.family_name || p.given_name, p.nickname),
          exists (select 1 from public.user_pins u where u.user_id = m.user_id)
+           and exists (select 1 from auth.users a where a.id = m.user_id and a.email like '%@users.haenya.app'),
+         p.is_placeholder
+           and not exists (select 1 from public.user_pins u where u.user_id = m.user_id)
            and exists (select 1 from auth.users a where a.id = m.user_id and a.email like '%@users.haenya.app')
   from public.groups g
   join public.group_members m on m.group_id = g.id
   join public.profiles p on p.id = m.user_id
   where g.invite_code = upper(trim(p_code))
   order by m.joined_at
+$$;
+
+-- 미리 만든 자리에 처음 들어오기: 초대 코드 + 그 그룹의 미리 만든 멤버(숫자 아직 없음)일 때만 (가짜) 이메일을 돌려준다
+-- → 서버(/api/claim)가 비밀번호를 만들어 로그인 → 앱은 프로필 미완성이라 /login에서 성·이름·숫자·약관을 채운다
+create or replace function public.claim_account(p_user uuid, p_code text)
+returns text language sql stable security definer set search_path = public, auth as $$
+  select a.email
+  from public.groups g
+  join public.group_members m on m.group_id = g.id and m.user_id = p_user
+  join public.profiles p on p.id = p_user and p.is_placeholder
+  join auth.users a on a.id = p_user and a.email like '%@users.haenya.app'
+  where g.invite_code = upper(trim(p_code))
+    and not exists (select 1 from public.user_pins u where u.user_id = p_user)
 $$;
 
 -- 4자리 확인. 맞으면 그 계정의 (가짜) 이메일을 돌려준다 → 서버(/api/restore)가 비밀번호를 만들어 로그인
@@ -989,7 +1018,8 @@ grant execute on function
 to authenticated;
 -- 서버(service_role) 전용
 grant execute on function public.kakao_unlink_target(text), public.delete_user_account(uuid) to service_role;
-grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text), public.redeem_transfer_token(text) to anon, authenticated;
+grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text), public.redeem_transfer_token(text),
+  public.claim_account(uuid, text) to anon, authenticated;
 grant execute on function public.get_invite_preview(text), public.haenya_today(),
   public.to_check_date(timestamptz), public.week_start(date)
 to anon, authenticated;

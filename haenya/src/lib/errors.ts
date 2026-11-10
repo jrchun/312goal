@@ -23,6 +23,7 @@ const messages: Record<string, string> = {
   NO_PIN: '숫자를 안 정한 계정이다. 그룹장한테 초기화해달라고 해.',
   NOT_OWNER: '그룹장만 할 수 있다.',
   REGISTER_FAILED: '가입이 안 됐다. 잠깐 뒤에 다시 해봐.',
+  CLAIM_FAILED: '이미 누가 들어온 자리다. 그룹장한테 물어봐.',
   RESTORE_FAILED: '되찾기가 안 됐다. 다시 해봐.',
 };
 

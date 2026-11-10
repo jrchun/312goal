@@ -34,3 +34,9 @@ export async function restoreWithPin(userId: string, pin: string): Promise<void>
   if (error) throw new Error('RESTORE_FAILED');
 }
 
+/** 미리 만들어 둔 내 자리에 처음 들어오기 (숫자 아직 없음) → 로그인 후 /login에서 숫자·약관을 정한다 */
+export async function claimAccount(userId: string, code: string): Promise<void> {
+  const cred = await post<{ email: string; password: string }>('/api/claim', { user_id: userId, code });
+  const { error } = await supabase.auth.signInWithPassword({ email: cred.email, password: cred.password });
+  if (error) throw new Error('CLAIM_FAILED');
+}
