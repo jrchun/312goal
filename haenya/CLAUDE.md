@@ -50,6 +50,7 @@
 - 이름은 성(`family_name`)·이름(`given_name`) 따로. 화면·찌르기에는 이름만(`displayName()`, 보드의 nickname = 이름). `nickname`은 성+이름 전체.
 - Supabase 설정: 이메일 로그인 ON, **"Confirm email" OFF** 여야 가입이 된다(사용자가 대시보드에서).
 - 같은 휴대폰이라도 카톡 브라우저·Safari·홈 화면 아이콘은 저장소가 따로라 각자 처음 한 번 되찾기가 필요하다. 기기 특징으로 추측해 자동 연결(핑거프린팅)은 하지 않는다(오인식·개인정보).
+- **미리 만든 멤버 자리**(2026-11-10~): 운영자가 만든 계정(`profiles.is_placeholder`, 숫자 없음). 초대 링크 동그라미 → "처음 왔다" + [나 맞다] → `/api/claim`(`functions/api/claim.ts`, DB `claim_account`: 초대 코드 + 그 그룹의 숫자 없는 미리 만든 자리일 때만) → 로그인 → 프로필 미완성이라 `/login`에서 성·이름·숫자·약관. 숫자를 정하면(`set_my_pin`) 자리 표시가 풀리고 이후엔 보통 되찾기. 만들 때는 실서버 `/api/register` + Supabase signUp(비밀값을 몰라도 됨) 후 SQL로 is_placeholder·group_members.
 - 카카오(예전 방식, 보조): `signInWithKakao`(`src/lib/auth.web.ts`) → `/auth/kakao` → `functions/api/kakao-token.ts` → `signInWithIdToken`. 되찾기 화면에서 카카오 계정만 "카카오로 이어가기"로 쓴다.
 `/api/*`는 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 가입·되찾기를 끝까지 테스트할 수 없다(배포 주소에서 테스트).
 프로필 미완성(약관·성이름·4자리, 임시 숫자) → `/login`, 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
@@ -169,7 +170,7 @@
 
 - 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). 책임자 천성우 / jrchun1@naver.com(사용자 확정). 오픈 전 전문가 검토 권장.
 - DB 휴면 방지: `.github/workflows/haenya-keepalive.yml`(매일 06:17 KST, 공개 키로 읽기 1회). GitHub 예약 실행은 **main에 이 파일이 있어야** 돈다.
-- 312goal 2026 기록 이관은 하지 않는다(사용자 결정 2026-11-10: 했냐는 새 서비스로 시작). 이관 스크립트는 지웠다. DB의 `season_results` 표(옛 기록 5줄, 화면에서 안 씀)는 남아 있음 — 지우려면 사용자 확인 후.
+- **312goal 2026 이어서 시험하기(사용자 결정 2026-11-10, 앞의 "이관 안 함"을 바꿈):** 그룹 `312_2026`(초대 코드 FB8SHE98, 주 3회)에 미리 만든 자리 5개(천·호·밤·혁·고, 천이 그룹장). 옛 사이트 누적(11-10 기준 천115·호108·밤106·혁58/120·고37)을 `season_results`(group_id·user_id 연결)에 두고 **시즌 누적 = 이전 기록 + 했냐 인증**(`group_week_board`, `submit_checkin`이 그 해 season_results를 더함). 2027년엔 자동으로 0부터. 날짜 기록은 없어서 52주 칸·4주 순위는 넘어온 날부터.
 - 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
 
 ## 탭 이동 속도 (사용자 요청으로 개선)
