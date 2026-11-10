@@ -67,6 +67,8 @@ export default function Join() {
     })();
   }, [canAutoJoin, code, s]);
 
+  // 카톡에서 찌르기·인증 카드를 눌러 왔는데 이미 이 그룹이면 바로 홈으로
+  if (focused && loggedIn && agreed && alreadyHere) return <Redirect href="/home" />;
   if (focused && loggedIn && !agreed) return <Redirect href={`/login?next=${encodeURIComponent(`/join/${code}`)}` as never} />;
 
   const join = () => router.push(`/login?next=${encodeURIComponent(`/join/${code}`)}` as never);

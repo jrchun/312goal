@@ -76,7 +76,8 @@ export default function CheckinDone() {
         image: square,
         title: `${input.nickname} 했다.`,
         description: `${input.groupName} · ${annual ? '올해' : '이번 주'} ${input.weekCount}/${input.weeklyGoal}`,
-        link: `${siteUrl()}/home`,
+        // 그룹 초대 주소: 같은 그룹이면 바로 홈, 아니면 내 자리 고르기
+        link: `${siteUrl()}/join/${membership?.group.invite_code ?? ''}`,
         buttonTitle: '나도 인증하러 가기',
       });
     } catch (e) {

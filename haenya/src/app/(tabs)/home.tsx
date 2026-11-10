@@ -106,52 +106,58 @@ export default function Home() {
 
   const weekLabel = () => `W${String(isoWeek(today)).padStart(2, '0')} · ${weekdayLabel()}`;
 
-  /** 재촉 카드를 카톡으로. 안 되면 문장 + 링크 공유 */
-  const shareNudge = async (card: Parameters<typeof makeNudgeCard>[0], title: string, description: string, done: string) => {
+  // 공유 링크는 그룹 초대 주소: 받은 사람이 이 그룹 계정이면 바로 홈, 다른 그룹 계정(카톡 브라우저에 예전 계정 등)이면 내 자리 고르기
+  const groupLink = () => (group ? `${siteUrl()}/join/${group.invite_code}` : `${siteUrl()}/home`);
+
+  /**
+   * 재촉 카드를 카톡으로 보내고, **실제로 보냈을 때만** 찌르기를 기록한다(record).
+   * 카톡 창을 취소하거나 공유 창을 닫으면 기록 안 함 (사용자 제보 2026-11-10: 안 보냈는데 찔렀다고 남음).
+   * 안 되면 문장 + 링크 공유.
+   */
+  const shareNudge = async (
+    card: Parameters<typeof makeNudgeCard>[0], title: string, description: string, done: string,
+    record: () => Promise<boolean>,
+  ) => {
     setPicker(false); // 찌르기 창을 먼저 닫아야 "카드 준비됐다" 창이 그 뒤에 숨지 않는다
+    const link = groupLink();
+    const finish = async () => {
+      if (await record()) setNotice({ text: done, tone: 'info' });
+    };
     try {
       const image = await makeNudgeCard(card);
-      await shareCardToKakao({ image, title, description, link: `${siteUrl()}/home`, buttonTitle: '눌러서 인증하기' });
-      setNotice({ text: done, tone: 'info' });
+      await shareCardToKakao({ image, title, description, link, buttonTitle: '눌러서 인증하기' });
+      await finish();
       return;
     } catch (e) {
       if (e instanceof Error && e.message === 'CANCELLED') {
-        setNotice({ text: '찔렀다. 카톡은 안 보냈다.', tone: 'info' });
+        setNotice({ text: '안 보냈다. 안 찔렀다.', tone: 'info' });
         return;
       }
       console.warn('nudge card share failed', e);
     }
-    const text = `${title} ${description} ${siteUrl()}/home`;
+    const text = `${title} ${description} ${link}`;
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'share' in navigator) {
         await navigator.share({ text });
       } else if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(text);
-        setNotice({ text: '찔렀다. 단톡방에 붙여넣어.', tone: 'info' });
+        if (await record()) setNotice({ text: '찔렀다. 단톡방에 붙여넣어.', tone: 'info' });
         return;
       } else {
-        await Share.share({ message: text });
+        const r = await Share.share({ message: text });
+        if (r.action === Share.dismissedAction) throw new Error('CANCELLED');
       }
     } catch {
-      // 공유 창을 닫아도 찌르기 기록은 남았다
+      setNotice({ text: '안 보냈다. 안 찔렀다.', tone: 'info' });
+      return;
     }
-    setNotice({ text: done, tone: 'info' });
+    await finish();
   };
 
   // 한 사람 찌르기: 같은 사람에게 하루 1번 (DB send_nudge). 다른 사람은 따로 찌를 수 있다
   const poke = async (r: BoardRow) => {
-    if (!group) return;
+    if (!group || poked[r.user_id]) return;
     setNotice(null);
-    const { error } = await supabase.rpc('send_nudge', { p_group_id: group.id, p_to_user: r.user_id });
-    if (error && error.message !== 'ALREADY_NUDGED') {
-      setNotice({ text: errorMessage(error), tone: 'error' });
-      return;
-    }
-    setPoked((p) => ({ ...p, [r.user_id]: true }));
-    if (error) {
-      setNotice({ text: errorMessage(error), tone: 'info' });
-      return;
-    }
     const days = r.days_silent;
     await shareNudge(
       {
@@ -166,26 +172,38 @@ export default function Home() {
       `${callName(r.nickname)} 했냐?`,
       days > 0 ? `${days}일째 무소식. 다들 기다리는 중.` : '다들 기다리는 중.',
       `${r.nickname} 찔렀다.`,
+      async () => {
+        const { error } = await supabase.rpc('send_nudge', { p_group_id: group.id, p_to_user: r.user_id });
+        if (error && error.message !== 'ALREADY_NUDGED') {
+          setNotice({ text: errorMessage(error), tone: 'error' });
+          return false;
+        }
+        setPoked((p) => ({ ...p, [r.user_id]: true }));
+        return true;
+      },
     );
   };
 
-  // 다 같이 찌르기 ("얘들아 했냐?"): 단톡방용, 하루 1번 (DB send_group_nudge)
+  // 다 같이 찌르기 ("얘들아 했냐?"): 단톡방용, 하루 1번 (DB send_group_nudge). 이름은 화면의 "오늘 안 한 사람"
   const pokeAll = async () => {
-    if (!group) return;
+    if (!group || pokedAll) return;
     setNotice(null);
-    const { data, error } = await supabase.rpc('send_group_nudge', { p_group_id: group.id });
-    if (error) {
-      if (error.message === 'ALREADY_NUDGED') setPokedAll(true);
-      setNotice({ text: errorMessage(error), tone: error.message === 'ALREADY_NUDGED' ? 'info' : 'error' });
-      return;
-    }
-    setPokedAll(true);
-    const names = ((data as { nickname: string }[] | null) ?? []).map((x) => x.nickname);
+    const names = notToday.map((x) => x.nickname);
+    if (!names.length) return;
     await shareNudge(
       { groupName: group.name, weekLabel: weekLabel(), callName: '얘들아', weekCount: 0, weeklyGoal: 0, daysSilent: 0, group: { names } },
       '얘들아 했냐?',
       `오늘 아직 ${names.length}명. ${names.join(', ')}. 다들 기다리는 중.`,
       '다 같이 찔렀다.',
+      async () => {
+        const { error } = await supabase.rpc('send_group_nudge', { p_group_id: group.id });
+        if (error && error.message !== 'ALREADY_NUDGED') {
+          setNotice({ text: errorMessage(error), tone: 'error' });
+          return false;
+        }
+        setPokedAll(true);
+        return true;
+      },
     );
   };
 
