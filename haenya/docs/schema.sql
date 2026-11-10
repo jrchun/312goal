@@ -209,6 +209,41 @@ create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
 -- ---------------------------------------------------------------------
+-- 2-1. 그룹 소식 (사용자 결정 2026-11-10)
+-- ---------------------------------------------------------------------
+-- 그룹에서 일어난 일을 한 줄씩 남긴다: 재미(인증·찌르기·기록 달성·순위 역전·무소식) + 감시(숫자 초기화·목표 변경·인증 삭제 등).
+-- 기록은 아래 함수·트리거 안에서 DB가 직접 남긴다(앱이 건너뛸 수 없음). 아무도 고치거나 지울 수 없다(그룹장도).
+-- 이름은 그때 이름을 data에 같이 적어 둔다(나중에 이름을 바꾸거나 나가도 읽을 수 있게). 문장은 앱(src/lib/feed.ts)이 만든다.
+create table if not exists public.group_events (
+  id         bigint generated always as identity primary key,
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  kind       text not null,
+  actor      uuid,            -- 한 사람 (없을 수 있음: 무소식 등)
+  target     uuid,            -- 당한 사람
+  data       jsonb not null default '{}',
+  dedupe     text,            -- 같은 일을 두 번 적지 않게 (무소식 등)
+  created_at timestamptz not null default now()
+);
+create index if not exists group_events_feed on public.group_events (group_id, created_at desc, id desc);
+create unique index if not exists group_events_dedupe on public.group_events (group_id, dedupe) where dedupe is not null;
+
+create or replace function public.log_event(
+  p_group uuid, p_kind text, p_actor uuid, p_target uuid,
+  p_data jsonb default '{}', p_dedupe text default null, p_at timestamptz default now()
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  -- 그룹이 지워지는 중이면(멤버·인증이 함께 지워질 때) 적지 않는다
+  if not exists (select 1 from public.groups where id = p_group) then return; end if;
+  insert into public.group_events (group_id, kind, actor, target, data, dedupe, created_at)
+  values (p_group, p_kind, p_actor, p_target,
+          coalesce(p_data, '{}') || jsonb_strip_nulls(jsonb_build_object(
+            'actor_name',  (select coalesce(given_name, nickname) from public.profiles where id = p_actor),
+            'target_name', (select coalesce(given_name, nickname) from public.profiles where id = p_target))),
+          p_dedupe, p_at)
+  on conflict (group_id, dedupe) where dedupe is not null do nothing;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 3. 권한 도우미 (RLS 안에서 쓰므로 security definer)
 -- ---------------------------------------------------------------------
 
@@ -357,6 +392,13 @@ create policy group_nudges_select on public.group_nudges for select to authentic
   using (public.is_group_member(group_id));
 revoke insert, update, delete on public.group_nudges from anon, authenticated;
 
+-- group_events(소식): 같은 그룹 조회만. 쓰기는 DB 함수·트리거로만
+alter table public.group_events enable row level security;
+drop policy if exists group_events_select on public.group_events;
+create policy group_events_select on public.group_events for select to authenticated
+  using (public.is_group_member(group_id));
+revoke insert, update, delete on public.group_events from anon, authenticated;
+
 -- season_results: 이어 붙인 그룹의 멤버만 조회
 drop policy if exists season_results_select on public.season_results;
 create policy season_results_select on public.season_results for select to authenticated
@@ -440,6 +482,7 @@ begin
   end if;
   insert into public.group_members (group_id, user_id, season_goal)
   values (g.id, auth.uid(), g.season_goal);   -- 트리거가 12명 초과를 막는다 (GROUP_FULL)
+  perform public.log_event(g.id, 'join', auth.uid(), null);
   return g;
 end $$;
 
@@ -462,6 +505,14 @@ declare
   verified boolean := p_taken_at is not null;
   is_counted boolean;
   new_id uuid;
+  v_before jsonb;       -- 인증 전 순위 {user_id: rank}
+  v_passed text[];      -- 이번 인증으로 제친 사람들
+  v_rank int;
+  v_season int;
+  v_goal int;
+  v_week int;
+  v_weekly int;
+  v_nudged timestamptz; -- 오늘 나를 찌른 가장 최근 시각
 begin
   if uid is null then raise exception 'NOT_LOGGED_IN'; end if;
   if not public.is_group_member(p_group_id) then raise exception 'NOT_A_MEMBER'; end if;
@@ -478,6 +529,10 @@ begin
     select 1 from public.checkins c
     where c.group_id = p_group_id and c.user_id = uid and c.check_date = d and c.counted);
 
+  if is_counted then
+    select jsonb_object_agg(b.user_id, b.rank) into v_before from public.group_week_board(p_group_id) b;
+  end if;
+
   begin
     insert into public.checkins (group_id, user_id, check_date, photo_path, taken_at, date_verified, counted)
     values (p_group_id, uid, d, p_photo_path, p_taken_at, verified, is_counted)
@@ -489,6 +544,38 @@ begin
     values (p_group_id, uid, d, p_photo_path, p_taken_at, verified, false)
     returning id into new_id;
   end;
+
+  -- 소식: 인정된 인증만 (같은 날 추가 사진은 적지 않는다)
+  if is_counted then
+    select b.season_count, b.season_goal, b.week_count, b.weekly_goal, b.rank
+      into v_season, v_goal, v_week, v_weekly, v_rank
+      from public.group_week_board(p_group_id) b where b.user_id = uid;
+    select max(t) into v_nudged from (
+      select max(n.created_at) as t from public.nudges n
+        where n.group_id = p_group_id and n.to_user = uid and n.nudge_date = d
+      union all
+      select max(n.created_at) from public.group_nudges n
+        where n.group_id = p_group_id and n.from_user <> uid and n.nudge_date = d) x;
+    perform public.log_event(p_group_id, 'checkin', uid, null, jsonb_strip_nulls(jsonb_build_object(
+      'season_count', v_season, 'season_goal', v_goal, 'week_count', v_week, 'weekly_goal', v_weekly,
+      'verified', verified,
+      'after_nudge_min', (extract(epoch from now() - v_nudged) / 60)::int)));
+    -- 기록 달성: 50회마다 / 올해 목표를 채운 순간
+    if v_season = v_goal then
+      perform public.log_event(p_group_id, 'goal_done', uid, null, jsonb_build_object('count', v_season));
+    elsif v_season % 50 = 0 then
+      perform public.log_event(p_group_id, 'milestone', uid, null, jsonb_build_object('count', v_season));
+    end if;
+    -- 순위 역전: 인증 전엔 나보다 위였는데 지금은 아래인 사람들
+    select array_agg(a.nickname order by a.rank) into v_passed
+      from public.group_week_board(p_group_id) a
+      where a.user_id <> uid
+        and (v_before ->> a.user_id::text)::int < (v_before ->> uid::text)::int
+        and a.rank > v_rank;
+    if v_passed is not null then
+      perform public.log_event(p_group_id, 'overtake', uid, null, jsonb_build_object('passed', to_jsonb(v_passed), 'rank', v_rank));
+    end if;
+  end if;
 
   return query
   select new_id, d, is_counted, verified,
@@ -538,6 +625,11 @@ begin
   on conflict (from_user, to_user, nudge_date) do nothing;
   if not found then raise exception 'ALREADY_NUDGED' using hint = '오늘은 이미 찔렀다.'; end if;
 
+  -- 소식: 누가 누구를 + 그 사람이 이번 주 몇 번째 찔렸는지
+  perform public.log_event(p_group_id, 'nudge', uid, p_to_user, jsonb_build_object(
+    'week_nudged', (select count(*) from public.nudges n
+                    where n.group_id = p_group_id and n.to_user = p_to_user and n.nudge_date >= public.week_start(d))));
+
   return query
   select b.nickname, b.week_count, b.weekly_goal, b.days_silent
   from public.group_week_board(p_group_id) b
@@ -569,6 +661,10 @@ begin
   values (p_group_id, uid, d)
   on conflict (group_id, from_user, nudge_date) do nothing;
   if not found then raise exception 'ALREADY_NUDGED' using hint = '오늘은 이미 찔렀다.'; end if;
+
+  perform public.log_event(p_group_id, 'nudge_all', uid, null, jsonb_build_object(
+    'count', (select count(*) from public.group_week_board(p_group_id) b
+              where b.user_id <> uid and b.last_check_date is distinct from d)));
 
   return query
   select b.nickname, b.week_count, b.weekly_goal, b.days_silent
@@ -811,7 +907,11 @@ begin
     end if;
     update public.groups set owner_id = next_owner where id = p_group;
     update public.group_members set role = 'owner' where group_id = p_group and user_id = next_owner;
+    perform public.log_event(p_group, 'owner_change', p_uid, next_owner);
   end if;
+  perform public.log_event(p_group, 'leave', p_uid, null);
+  -- 나가면서 한꺼번에 지우는 인증은 "인증 삭제" 소식으로 적지 않는다
+  perform set_config('haenya.bulk', '1', true);
   delete from public.checkins where group_id = p_group and user_id = p_uid;
   delete from public.group_members where group_id = p_group and user_id = p_uid;
 end $$;
@@ -874,6 +974,10 @@ begin
   on conflict (user_id) do update
     set pin_hash = excluded.pin_hash, is_temp = false, failed_count = 0, locked_until = null, updated_at = now();
   update public.profiles set is_placeholder = false where id = auth.uid() and is_placeholder;
+  if found then   -- 미리 만든 자리에 주인이 처음 들어왔다
+    perform public.log_event(m.group_id, 'seat', auth.uid(), null)
+      from public.group_members m where m.user_id = auth.uid();
+  end if;
 end $$;
 
 create or replace function public.my_pin_status()
@@ -960,6 +1064,8 @@ begin
   values (p_user, crypt(pin, gen_salt('bf', 8)), true, 0, null, now())
   on conflict (user_id) do update
     set pin_hash = excluded.pin_hash, is_temp = true, failed_count = 0, locked_until = null, updated_at = now();
+  -- 그룹장이 멤버 숫자를 초기화하면 그 멤버로 들어갈 수 있다 → 반드시 소식에 남긴다(몰래 못 하게)
+  perform public.log_event(p_group_id, 'pin_reset', auth.uid(), p_user);
   return pin;
 end $$;
 
@@ -1003,6 +1109,103 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 9-4. 소식: 표가 바뀔 때 남기는 것(트리거) + 읽기
+-- ---------------------------------------------------------------------
+
+-- 올해 목표 변경 (목표를 낮추면 순위가 오르니 공개한다). 합류 직후 처음 정하는 건 적지 않는다
+create or replace function public.log_goal_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.season_goal is distinct from old.season_goal and new.joined_at < now() - interval '10 minutes' then
+    perform public.log_event(new.group_id, 'goal_change', new.user_id, null,
+                             jsonb_build_object('from', old.season_goal, 'to', new.season_goal));
+  end if;
+  return new;
+end $$;
+drop trigger if exists member_goal_log on public.group_members;
+create trigger member_goal_log after update of season_goal on public.group_members
+  for each row execute function public.log_goal_change();
+
+-- 인증 삭제: 그날 인정 횟수가 실제로 줄 때만 (같은 날 다른 사진이 있으면 그게 인정으로 올라가므로 적지 않는다)
+-- 트리거 이름이 checkin_promote_next보다 앞이라 먼저 돈다 → "다른 사진이 남았나"를 올리기 전에 본다
+create or replace function public.log_checkin_delete()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if old.counted
+     and coalesce(current_setting('haenya.bulk', true), '') <> '1'
+     and exists (select 1 from public.group_members where group_id = old.group_id and user_id = old.user_id)
+     and not exists (select 1 from public.checkins c
+                     where c.group_id = old.group_id and c.user_id = old.user_id and c.check_date = old.check_date) then
+    perform public.log_event(old.group_id, 'checkin_delete', old.user_id, null, jsonb_build_object('date', old.check_date));
+  end if;
+  return old;
+end $$;
+drop trigger if exists checkin_log_delete on public.checkins;
+create trigger checkin_log_delete after delete on public.checkins
+  for each row execute function public.log_checkin_delete();
+
+-- 그룹 이름·주간 목표 변경
+create or replace function public.log_group_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.name is distinct from old.name then
+    perform public.log_event(new.id, 'group_rename', auth.uid(), null, jsonb_build_object('from', old.name, 'to', new.name));
+  end if;
+  if new.weekly_goal is distinct from old.weekly_goal then
+    perform public.log_event(new.id, 'weekly_goal', auth.uid(), null, jsonb_build_object('from', old.weekly_goal, 'to', new.weekly_goal));
+  end if;
+  return new;
+end $$;
+drop trigger if exists group_change_log on public.groups;
+create trigger group_change_log after update of name, weekly_goal on public.groups
+  for each row execute function public.log_group_change();
+
+-- 이름 변경 (남 행세 방지). 이름이 아직 없던 계정이 처음 정하는 건 적지 않는다
+create or replace function public.log_rename()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  was text := coalesce(old.family_name, '') || coalesce(old.given_name, '');
+  now_ text := coalesce(new.family_name, '') || coalesce(new.given_name, '');
+begin
+  if was <> '' and was <> now_ then
+    perform public.log_event(m.group_id, 'rename', new.id, null, jsonb_build_object('from', was, 'to', now_))
+      from public.group_members m where m.user_id = new.id;
+  end if;
+  return new;
+end $$;
+drop trigger if exists profile_rename_log on public.profiles;
+create trigger profile_rename_log after update of family_name, given_name on public.profiles
+  for each row execute function public.log_rename();
+
+-- 소식 읽기 (최신순). 읽을 때 "N일째 무소식"(3·7·14·30일)을 빠진 만큼 채워 넣는다
+-- (정해진 시각에 도는 작업이 없어서, 누가 열어볼 때 그 날짜 새벽 3시 시각으로 적는다 → 순서가 맞는다)
+create or replace function public.group_feed(p_group_id uuid, p_limit int default 60)
+returns table (id bigint, kind text, actor uuid, target uuid, data jsonb, created_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+begin
+  if not public.is_group_member(p_group_id) then return; end if;
+  insert into public.group_events (group_id, kind, target, data, dedupe, created_at)
+  select p_group_id, 'silence', b.user_id,
+         jsonb_build_object('target_name', b.nickname, 'days', t.days),
+         'silence:' || b.user_id || ':' || s.since || ':' || t.days,
+         ((s.since + t.days)::timestamp + interval '3 hours') at time zone 'Asia/Seoul'
+  from public.group_week_board(p_group_id) b
+  join public.profiles p on p.id = b.user_id and not p.is_placeholder   -- 아직 아무도 안 들어온 자리는 뺀다
+  cross join lateral (select public.haenya_today() - b.days_silent as since) s
+  cross join (values (3), (7), (14), (30)) t(days)
+  where b.days_silent >= t.days
+  on conflict (group_id, dedupe) where dedupe is not null do nothing;
+
+  return query
+  select e.id, e.kind, e.actor, e.target, e.data, e.created_at
+  from public.group_events e
+  where e.group_id = p_group_id
+  order by e.created_at desc, e.id desc
+  limit least(greatest(p_limit, 1), 200);
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 10. 함수 실행 권한
 -- ---------------------------------------------------------------------
 
@@ -1014,6 +1217,11 @@ revoke execute on function
   public.delete_user_account(uuid),
   public.kakao_unlink_target(text),
   public.promote_next_checkin(),
+  public.log_event(uuid, text, uuid, uuid, jsonb, text, timestamptz),
+  public.log_goal_change(),
+  public.log_checkin_delete(),
+  public.log_group_change(),
+  public.log_rename(),
   public.handle_new_user(),
   public.enforce_group_capacity()
 from public, anon, authenticated;
@@ -1030,6 +1238,7 @@ grant execute on function
   public.send_nudge(uuid, uuid),
   public.send_group_nudge(uuid),
   public.my_nudges_today(uuid),
+  public.group_feed(uuid, int),
   public.member_weeks(uuid, date, date),
   public.group_week_board(uuid),
   public.my_stats(uuid),

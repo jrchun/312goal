@@ -13,6 +13,7 @@ import { checkDate } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
 import { copyOrShareInvite } from '../../lib/invite';
 import { useCache } from '../../lib/cache';
+import { FeedEvent, feedClock, feedDay, feedKey, feedText, loadFeed, takeFeedView } from '../../lib/feed';
 import { thumbOf } from '../../lib/photos';
 import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
@@ -32,12 +33,14 @@ export default function Group() {
   const urls = data?.urls ?? {};
   const [open, setOpen] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
-  const [view, setView] = useState<'rank' | 'photos'>('rank');
+  const [view, setView] = useState<'rank' | 'photos' | 'feed'>('rank');
+  const feed = useCache<FeedEvent[]>(group ? feedKey(group.id) : null);
 
   // 저장된 게 있으면 바로 보여주고, 탭에 올 때마다 뒤에서 새로 받는다 (요청 1번)
   const load = useCallback(async () => {
     if (!group) return;
     try {
+      loadFeed(group.id).catch(() => undefined);
       await loadGroupTab(group.id);
     } catch (e) {
       setNotice(errorMessage(e));
@@ -46,6 +49,7 @@ export default function Group() {
 
   useFocusEffect(
     useCallback(() => {
+      if (takeFeedView()) setView('feed'); // 홈의 "소식"을 누르고 왔으면 소식 칸부터
       load();
     }, [load]),
   );
@@ -105,6 +109,31 @@ export default function Group() {
     isMe: p.user_id === me,
     unverified: !p.date_verified,
   }));
+  // 소식: 날짜별로 묶어 한 줄씩. 숫자 초기화만 빨간 글씨(감시용)
+  const lines = (feed ?? []).flatMap((e) => {
+    const t = feedText(e);
+    return t ? [{ e, ...t }] : [];
+  });
+  const feedList = (
+    <View>
+      {!feed ? <Text style={type.caption}>불러오는 중.</Text> : null}
+      {feed && !lines.length ? <Text style={[type.sentence, { color: color.black }]}>아직 소식이 없다.</Text> : null}
+      {lines.map((l, i) => {
+        const day = feedDay(l.e.created_at);
+        const first = i === 0 || feedDay(lines[i - 1].e.created_at) !== day;
+        return (
+          <View key={l.e.id}>
+            {first ? <Text style={[type.label, styles.feedDay, i > 0 && styles.feedDayGap]}>{day}</Text> : null}
+            <View style={styles.feedRow}>
+              <Text style={[type.sentence, styles.feedText, { color: l.warn ? color.textRed : color.black }]}>{l.text}</Text>
+              <Text style={type.caption}>{feedClock(l.e.created_at)}</Text>
+            </View>
+          </View>
+        );
+      })}
+      {lines.length ? <Text style={[type.caption, styles.note]}>그룹에서 일어난 일. 아무도 못 지운다.</Text> : null}
+    </View>
+  );
   const empty = <Text style={[type.sentence, { color: color.black }]}>이번 주는 아직 아무도 안 했다.</Text>;
 
   return (
@@ -126,7 +155,8 @@ export default function Group() {
             {(
               [
                 ['rank', '순위'],
-                ['photos', `이번 주 사진 ${photos.length}`],
+                ['photos', `사진 ${photos.length}`],
+                ['feed', '소식'],
               ] as const
             ).map(([k, label]) => {
               const on = view === k;
@@ -143,7 +173,7 @@ export default function Group() {
               );
             })}
           </View>
-          {view === 'rank' ? rankList : photos.length ? <PhotoGrid cols={4} items={items} onPress={setOpen} /> : empty}
+          {view === 'rank' ? rankList : view === 'feed' ? feedList : photos.length ? <PhotoGrid cols={4} items={items} onPress={setOpen} /> : empty}
         </>
       ) : null}
 
@@ -160,5 +190,9 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: color.black },
   segOff: { backgroundColor: color.cream },
   note: { paddingTop: space(2) },
+  feedDay: { color: color.black, paddingBottom: space(1) },
+  feedDayGap: { paddingTop: space(4) },
+  feedRow: { flexDirection: 'row', alignItems: 'baseline', gap: space(3), paddingVertical: space(2), borderTopWidth: line.row, borderTopColor: color.black },
+  feedText: { flex: 1 },
   loading: { paddingTop: space(5) },
 });

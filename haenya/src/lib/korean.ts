@@ -14,3 +14,8 @@ export function callName(name: string): string {
 export function ordinalWord(n: number): string {
   return ['', '첫', '두', '세', '네', '다섯', '여섯', '일곱'][n] ?? String(n);
 }
+
+/** 주어: 밤 → 밤이, 호 → 호가 */
+export function subj(name: string): string {
+  return `${name}${hasBatchim(name) ? '이' : '가'}`;
+}

@@ -2,7 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCache } from '../../lib/cache';
 import { boardKey, loadBoard, loadGroupTab, loadMyTab } from '../../lib/tabData';
 import { useCallback, useState } from 'react';
-import { Platform, Share, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Label, Notice } from '../../components/Form';
 import { PokePicker } from '../../components/PokePicker';
@@ -19,6 +19,7 @@ import { siteUrl } from '../../lib/invite';
 import { shareCardToKakao } from '../../lib/kakao';
 import { callName } from '../../lib/korean';
 import { useSession } from '../../lib/session';
+import { askFeedView, FeedEvent, feedKey, feedText, feedTime, loadFeed } from '../../lib/feed';
 import { isAnnual, paceSentence, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow, WeekSummary } from '../../lib/types';
@@ -38,6 +39,9 @@ export default function Home() {
   const [cardBusy, setCardBusy] = useState(false);
 
   const rows = useCache<BoardRow[]>(group ? boardKey(group.id) : null) ?? null;
+  const feed = useCache<FeedEvent[]>(group ? feedKey(group.id) : null);
+  // 홈에는 최신 소식 2줄만 (사용자 결정 2026-11-10). 누르면 그룹 탭 소식으로
+  const news = (feed ?? []).flatMap((e) => { const t = feedText(e); return t ? [{ e, ...t }] : []; }).slice(0, 2);
 
   const load = useCallback(async () => {
     if (!group) return;
@@ -50,6 +54,7 @@ export default function Home() {
     // 그룹·마이 탭을 미리: 화면 코드와 데이터를 뒤에서 받아 둔다 → 탭을 누르면 바로 뜬다
     router.prefetch('/group');
     router.prefetch('/my');
+    loadFeed(group.id).catch(() => undefined);
     loadGroupTab(group.id).catch(() => undefined);
     if (session) loadMyTab(group.id, session.user.id).catch(() => undefined);
     // 월요일에는 지난주 결산
@@ -121,7 +126,10 @@ export default function Home() {
     setPicker(false); // 찌르기 창을 먼저 닫아야 "카드 준비됐다" 창이 그 뒤에 숨지 않는다
     const link = groupLink();
     const finish = async () => {
-      if (await record()) setNotice({ text: done, tone: 'info' });
+      if (await record()) {
+        setNotice({ text: done, tone: 'info' });
+        if (group) loadFeed(group.id).catch(() => undefined); // 방금 찌른 게 소식에 바로 보이게
+      }
     };
     try {
       const image = await makeNudgeCard(card);
@@ -307,9 +315,33 @@ export default function Home() {
           )}
         </View>
       ) : null}
-      <View style={styles.notice}>
-        {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
-      </View>
+      {notice ? (
+        <View style={styles.notice}>
+          <Notice tone={notice.tone}>{notice.text}</Notice>
+        </View>
+      ) : null}
+      {news.length ? (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="그룹 소식 전체 보기"
+          onPress={() => {
+            askFeedView();
+            router.navigate('/group');
+          }}
+          style={styles.news}
+        >
+          <View style={styles.newsHead}>
+            <Label>소식</Label>
+            <Text style={type.caption}>전체 →</Text>
+          </View>
+          {news.map((n) => (
+            <View key={n.e.id} style={styles.newsRow}>
+              <Text style={[type.caption, styles.newsText, { color: n.warn ? color.textRed : color.black }]} numberOfLines={1}>{n.text}</Text>
+              <Text style={type.caption}>{feedTime(n.e.created_at)}</Text>
+            </View>
+          ))}
+        </Pressable>
+      ) : null}
       <SaveImageSheet uri={sheet} onClose={() => setSheet(null)} />
       <PokePicker
         visible={picker}
@@ -325,15 +357,20 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  headline: { color: color.red, paddingTop: space(2), paddingBottom: space(2) },
+  headline: { color: color.red, paddingTop: space(1), paddingBottom: space(1) },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(3) },
   progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: space(1), paddingBottom: space(1) },
   sentence: { color: color.black, flexShrink: 1 },
-  cta: { paddingVertical: space(5) },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: layout.minTouch },
+  cta: { paddingVertical: space(2) },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: space(7) },
   list: { paddingTop: space(1) },
   alone: { paddingTop: space(3) },
-  poke: { paddingTop: space(4), alignItems: 'flex-start' },
-  notice: { paddingVertical: space(4) },
+  poke: { paddingTop: space(2), alignItems: 'flex-start' },
+  notice: { paddingTop: space(3) },
+  // 소식 2줄까지 한 화면에 들어오게 위쪽 여백들을 줄였다 (인증 버튼·순위 제목·알림 빈칸)
+  news: { paddingTop: space(2), paddingBottom: space(2), gap: space(1) },
+  newsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  newsRow: { flexDirection: 'row', gap: space(3), alignItems: 'baseline' },
+  newsText: { flex: 1 },
   summary: { backgroundColor: color.black, padding: space(4), gap: space(2), marginTop: space(3) },
 });

@@ -251,3 +251,44 @@ select pg_temp.try(format('update groups set weekly_goal = null where id = %L', 
 select nickname, season_count, season_goal, weekly_goal, rank from group_week_board(:'dgid') order by rank, nickname;
 select week_target is null as "초대 미리보기 목표 없음" from get_invite_preview(:'dcode');
 select group_target is null as "결산 목표 없음" from group_week_summary(:'dgid');
+
+\echo '== 21. 그룹 소식'
+reset role; set role authenticated; select pg_temp.as_user('a');
+select kind, data ->> 'actor_name' as actor, data ->> 'target_name' as target,
+       data - 'actor_name' - 'target_name' as data
+  from group_feed(:'gid', 200) order by id;
+select pg_temp.try($$insert into group_events (group_id, kind) select id, 'x' from groups limit 1$$) as "직접 쓰기(ERR)";
+select pg_temp.try($$delete from group_events$$) as "직접 지우기(ERR)";
+select pg_temp.try($$select log_event(null, 'x', null, null)$$) as "기록 함수 직접 부르기(ERR)";
+select pg_temp.as_user('m');
+select count(*) as "다른 그룹 사람: 소식 0줄" from group_feed(:'gid');
+-- 기기방(dgid): 이름 변경 · 목표 변경 · 숫자 초기화 · 자리 찾기 · 그룹 설정
+select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select kind, data ->> 'actor_name' as actor, data ->> 'target_name' as target,
+       data - 'actor_name' - 'target_name' as data
+  from group_feed(:'dgid', 200) order by id;
+-- 인증 삭제 · 순위 역전 · 무소식
+reset role;
+update group_members set joined_at = now() - interval '9 days' where group_id = :'dgid';
+set role authenticated; select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select counted from submit_checkin(:'dgid', :'dgid' || '/' || md5('dev2')::uuid || '/a.jpg', now());
+select pg_temp.try(format('select send_nudge(%L, %L)', :'dgid', md5('dev1')::uuid)) as "인증 뒤 찌르기";
+select pg_temp.try(format('select send_group_nudge(%L)', :'dgid')) as "얘들아";
+select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select counted as "찔린 성우가 인증" from submit_checkin(:'dgid', :'dgid' || '/' || md5('dev1')::uuid || '/a.jpg', now());
+select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select kind, data ->> 'actor_name' as actor, data ->> 'target_name' as target, data - 'actor_name' - 'target_name' as data
+  from group_feed(:'dgid', 200) where kind not in ('join', 'pin_reset', 'seat', 'weekly_goal') order by created_at, id;
+delete from checkins where group_id = :'dgid' and user_id = auth.uid();
+update group_members set season_goal = 100 where group_id = :'dgid' and user_id = auth.uid();
+select kind, data - 'actor_name' as data from group_feed(:'dgid', 3) order by id;
+-- 민지(0/100)가 다시 인증 → 1% > 성우 1/150 → 성우를 제친다
+select counted from submit_checkin(:'dgid', :'dgid' || '/' || md5('dev2')::uuid || '/b.jpg', now());
+select kind, data ->> 'actor_name' as actor, data - 'actor_name' as data from group_feed(:'dgid', 1);
+select count(*) as "무소식 두 번 읽어도 중복 없음" from group_feed(:'dgid', 200) where kind = 'silence';
+-- 그룹이 통째로 지워질 때 오류 없이 (마지막 멤버 나가기)
+reset role; set role authenticated; select pg_temp.as_user('m');
+select invite_code as xcode, id as xgid from create_group('혼자방') \gset
+select counted from submit_checkin(:'xgid', :'xgid' || '/' || pg_temp.uid('m') || '/a.jpg', now());
+select pg_temp.try(format('select leave_group(%L)', :'xgid')) as "혼자 나가기(그룹 삭제) ok";
+reset role; select count(*) as "지워진 그룹 소식 0" from group_events where group_id = :'xgid';
