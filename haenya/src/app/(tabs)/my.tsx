@@ -54,18 +54,21 @@ export default function My() {
   const projected = stats?.projected ?? 0;
   const short = goal - projected;
 
-  const viewer: ViewerPhoto | null = useMemo(() => {
-    const p = photos.find((x) => x.id === open);
-    if (!p) return null;
-    const [, m, d] = p.check_date.split('-');
-    return {
-      id: p.id,
-      url: urls[p.photo_path],
-      title: `${Number(m)}월 ${Number(d)}일${p.counted ? '' : ' · 사진만 저장'}`,
-      unverified: !p.date_verified,
-      canDelete: true,
-    };
-  }, [open, photos, urls]);
+  const viewerPhotos: ViewerPhoto[] = useMemo(
+    () =>
+      photos.map((p) => {
+        const [, m, d] = p.check_date.split('-');
+        const notes = [p.counted ? '' : '사진만 저장', p.date_verified ? '' : '날짜 미확인'].filter(Boolean);
+        return {
+          id: p.id,
+          url: urls[p.photo_path],
+          title: `${Number(m)}월 ${Number(d)}일`,
+          subtitle: notes.join(' · ') || undefined,
+          canDelete: true,
+        };
+      }),
+    [photos, urls],
+  );
 
   return (
     <Screen>
@@ -134,13 +137,14 @@ export default function My() {
       </>
       ) : null}
       <PhotoViewer
-        photo={viewer}
+        photos={viewerPhotos}
+        startId={open}
         onClose={() => setOpen(null)}
-        onDelete={async () => {
-          const p = photos.find((x) => x.id === open);
+        onDelete={async (v) => {
+          const p = photos.find((x) => x.id === v.id);
           if (!p) return;
           await deleteCheckin(p);
-          setOpen(null);
+          // 지운 뒤에도 보기는 그대로 — 다음 사진이 그 자리에 온다. 마지막 한 장이었으면 저절로 닫힌다
           await load();
         }}
       />

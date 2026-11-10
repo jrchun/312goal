@@ -18,7 +18,7 @@ import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { color, font, layout, line, space, type } from '../../theme';
 
-/** 그룹 — 최근 4주 달성 순위 + 이번 주 인증샷 모음(반응) + 초대 링크 */
+/** 그룹 — 최근 4주 달성 순위 + 이번 주 인증샷 모음 + 초대 링크 */
 export default function Group() {
   const { membership, session } = useSession();
   const group = membership?.group;
@@ -51,17 +51,20 @@ export default function Group() {
   const names = useMemo(() => Object.fromEntries(board.map((r) => [r.user_id, r.nickname])), [board]);
   const ranked = [...board].sort((a, b) => a.rank - b.rank || a.nickname.localeCompare(b.nickname, 'ko'));
 
-  const viewer: ViewerPhoto | null = useMemo(() => {
-    const p = photos.find((x) => x.id === open);
-    if (!p) return null;
-    const [, m, d] = p.check_date.split('-');
-    return {
-      id: p.id,
-      url: urls[p.photo_path],
-      title: `${names[p.user_id] ?? ''} · ${Number(m)}월 ${Number(d)}일`,
-      unverified: !p.date_verified,
-    };
-  }, [open, photos, urls, names]);
+  // 크게 보기: 이번 주 사진 전체를 넘겨서 좌우로 넘기고 아래 줄에서 고른다
+  const viewerPhotos: ViewerPhoto[] = useMemo(
+    () =>
+      photos.map((p) => {
+        const [, m, d] = p.check_date.split('-');
+        return {
+          id: p.id,
+          url: urls[p.photo_path],
+          title: names[p.user_id] ?? '',
+          subtitle: `${Number(m)}월 ${Number(d)}일${p.date_verified ? '' : ' · 날짜 미확인'}`,
+        };
+      }),
+    [photos, urls, names],
+  );
 
   const invite = async () => {
     if (!group) return;
@@ -137,7 +140,7 @@ export default function Group() {
         </>
       ) : null}
 
-      <PhotoViewer photo={viewer} onClose={() => setOpen(null)} />
+      <PhotoViewer photos={viewerPhotos} startId={open} onClose={() => setOpen(null)} />
     </Screen>
   );
 }
