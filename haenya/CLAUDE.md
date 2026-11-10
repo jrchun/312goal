@@ -168,7 +168,7 @@
 
 - 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). 책임자 천성우 / jrchun1@naver.com(사용자 확정). 오픈 전 전문가 검토 권장.
 - DB 휴면 방지: `.github/workflows/haenya-keepalive.yml`(매일 06:17 KST, 공개 키로 읽기 1회). GitHub 예약 실행은 **main에 이 파일이 있어야** 돈다.
-- 312goal 2026 기록 이관: `bash scripts/import-312goal.sh 2026`(옛 사이트 `../312goal/index.html`의 공개 키로 읽음) → `season_results`(시즌 합계만, 재실행하면 최신 숫자로 덮어씀). 옛 프로젝트는 공개 키로 읽기만. 실제 인원은 5명(천·호·고·혁·밤). **12월 31일 이후 한 번 더 실행.** group_id·user_id는 아직 비어 있음(비어 있으면 아무도 못 봄).
+- 312goal 2026 기록 이관은 하지 않는다(사용자 결정 2026-11-10: 했냐는 새 서비스로 시작). 이관 스크립트는 지웠다. DB의 `season_results` 표(옛 기록 5줄, 화면에서 안 씀)는 남아 있음 — 지우려면 사용자 확인 후.
 - 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
 
 ## 탭 이동 속도 (사용자 요청으로 개선)

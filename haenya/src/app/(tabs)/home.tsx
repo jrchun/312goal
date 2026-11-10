@@ -21,7 +21,7 @@ import { callName } from '../../lib/korean';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow, WeekSummary } from '../../lib/types';
-import { color, space, type } from '../../theme';
+import { color, layout, space, type } from '../../theme';
 
 /** 홈 — "오늘 했냐?"에 답하는 화면. 이번 주 n/목표 + 인증 버튼 + 이번 주 순위 + 무소식 찌르기 */
 export default function Home() {
@@ -236,7 +236,6 @@ export default function Home() {
 
       <View style={styles.sectionHead}>
         <Label>이번 주 순위</Label>
-        <Button variant="text" label="전체 보기" onPress={() => router.push('/group')} />
       </View>
       <View style={styles.list}>
         {shown.map((r) => (
@@ -288,7 +287,7 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(3) },
   sentence: { color: color.black, flexShrink: 1 },
   cta: { paddingVertical: space(5) },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: layout.minTouch },
   list: { paddingTop: space(1) },
   alone: { paddingTop: space(3) },
   poke: { paddingTop: space(4), alignItems: 'flex-start' },

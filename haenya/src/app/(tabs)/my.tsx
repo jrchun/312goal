@@ -11,7 +11,7 @@ import { deleteCheckin } from '../../lib/account';
 import { checkDate, weekStart } from '../../lib/dates';
 import { useCache } from '../../lib/cache';
 import { loadMyTab, MyTab, myKey } from '../../lib/tabData';
-import { useSession } from '../../lib/session';
+import { displayName, useSession } from '../../lib/session';
 import { color, font, line, space, type } from '../../theme';
 
 /** 마이 — 시즌 누적을 가장 크게, 연말 예측으로 압박. 52주 칸, 찌른·찔린 횟수, 내 인증샷 */
@@ -74,7 +74,7 @@ export default function My() {
     <Screen>
       <View style={styles.top}>
         <Text style={[type.caption, { color: color.black }]} numberOfLines={1}>
-          {profile?.nickname} · {group?.name}
+          {displayName(profile)} · {group?.name}
         </Text>
         <View style={styles.links}>
           <Button variant="text" label="설정" onPress={() => router.push('/settings')} />
