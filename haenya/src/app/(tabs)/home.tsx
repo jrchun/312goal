@@ -365,7 +365,8 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   // 웹은 주소창·아래 막대만큼 화면이 짧다(아이폰 Safari 약 690px) → 홈은 제목·숫자를 조금 줄여 한 화면에 맞춘다
-  headline: { color: color.red, fontSize: 124, lineHeight: 124 * 0.85, paddingBottom: space(1) },
+  // paddingTop: 줄 높이(0.85)가 글자보다 낮아 윗부분이 잘린다(한 줄 제한 = 넘침 숨김) → 위에 여유를 둔다
+  headline: { color: color.red, fontSize: 124, lineHeight: 124 * 0.85, paddingTop: space(3), paddingBottom: space(1) },
   progress: { fontSize: 76, lineHeight: 76 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(2) },
   progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: 0 },
