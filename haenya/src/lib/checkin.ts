@@ -36,17 +36,19 @@ export async function submitCheckin(groupId: string, userId: string, photo: Prep
     throw new Error('PHOTO_NOT_TODAY');
   }
   const path = `${groupId}/${userId}/${uuid()}.jpg`;
-  const up = await supabase.storage.from(CHECKIN_BUCKET).upload(path, photo.blob, {
-    contentType: 'image/jpeg',
-    upsert: false,
-  });
-  if (up.error) throw new Error('UPLOAD_FAILED');
-  // 작은 사진(격자용). 실패해도 인증은 그대로 — 화면이 큰 사진으로 대신 보여준다
-  if (photo.thumb) {
-    await supabase.storage
-      .from(CHECKIN_BUCKET)
-      .upload(thumbOf(path), photo.thumb, { contentType: 'image/jpeg', upsert: false })
-      .catch(() => undefined);
+  // 큰 사진과 작은 사진(격자용)을 동시에 올린다. 작은 사진은 실패해도 인증은 그대로 — 화면이 큰 사진으로 대신 보여준다
+  const [up] = await Promise.all([
+    supabase.storage.from(CHECKIN_BUCKET).upload(path, photo.blob, { contentType: 'image/jpeg', upsert: false }),
+    photo.thumb
+      ? supabase.storage
+          .from(CHECKIN_BUCKET)
+          .upload(thumbOf(path), photo.thumb, { contentType: 'image/jpeg', upsert: false })
+          .then(() => undefined, () => undefined)
+      : undefined,
+  ]);
+  if (up.error) {
+    await supabase.storage.from(CHECKIN_BUCKET).remove([thumbOf(path)]).then(() => undefined, () => undefined);
+    throw new Error('UPLOAD_FAILED');
   }
 
   const { data, error } = await supabase

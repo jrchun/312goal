@@ -70,7 +70,7 @@ export default function Home() {
   const me = rows?.find((r) => r.is_me);
   const doneToday = me?.last_check_date === today;
   // 연간 목표만인 그룹(주간 목표 없음): 큰 숫자는 올해 누적/목표, 순위는 목표 대비 % (DB rank)
-  const annual = isAnnual(group?.weekly_goal);
+  const annual = isAnnual(me ? me.weekly_goal : group?.weekly_goal);
   const goal = me?.weekly_goal ?? group?.weekly_goal ?? 3;
   const count = me?.week_count ?? 0;
   const left = Math.max(0, goal - count);

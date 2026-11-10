@@ -23,8 +23,13 @@ export type UserState = { session: Session | null; profile: Profile | null; memb
 
 const Ctx = createContext<SessionState | null>(null);
 
+/**
+ * 내 프로필·그룹·숫자 상태 읽기. 하나라도 못 읽으면 오류를 던진다.
+ * (못 읽은 걸 "없음"으로 치면, 잠깐 인터넷이 끊겼을 때 멀쩡한 계정이 "프로필 미완성"으로 보여
+ *  이름·숫자를 다시 정하는 화면으로 가 버린다)
+ */
 async function loadUserData(userId: string) {
-  const [{ data: profile }, { data: member }, { data: pin }] = await Promise.all([
+  const [{ data: profile, error: e1 }, { data: member, error: e2 }, { data: pin, error: e3 }] = await Promise.all([
     supabase.from('profiles').select('id, nickname, family_name, given_name, avatar_url, terms_agreed_at').eq('id', userId).maybeSingle(),
     supabase
       .from('group_members')
@@ -33,6 +38,7 @@ async function loadUserData(userId: string) {
       .maybeSingle(),
     supabase.rpc('my_pin_status').maybeSingle(),
   ]);
+  if (e1 || e2 || e3) throw new Error('LOAD_FAILED');
   return {
     profile: (profile as Profile | null) ?? null,
     membership: member && member.group ? (member as unknown as Membership) : null,
@@ -53,7 +59,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const latest = useRef(0);
   const apply = useCallback(async (s: Session | null): Promise<UserState> => {
     const id = ++latest.current;
-    const d = s ? await loadUserData(s.user.id) : { profile: null, membership: null, pin: null };
+    let d: Omit<UserState, 'session'> = { profile: null, membership: null, pin: null };
+    if (s) {
+      // 못 읽으면 조금씩 쉬었다가 다시 (0.5초 → 1.5초 → 3초 … 최대 5초 간격). 읽을 때까지 "불러오는 중"으로 둔다
+      for (let attempt = 0; ; attempt++) {
+        try {
+          d = await loadUserData(s.user.id);
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, Math.min(5000, 500 + attempt * 1000)));
+          if (id !== latest.current) return { session: s, ...d };
+        }
+      }
+    }
     if (id !== latest.current) return { session: s, ...d };
     if (!s) {
       clearCache();
@@ -83,8 +101,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return apply(data.session);
   }, [apply]);
 
+  // 이 브라우저에서만 로그아웃한다. (기본값은 "모든 기기에서 로그아웃"이라 Safari에서 나가면 카톡 브라우저·다른 폰도 같이 풀려 버린다)
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     await apply(null);
   }, [apply]);
 

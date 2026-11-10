@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
@@ -8,15 +8,21 @@ import { Screen } from '../components/Screen';
 import { submitCheckin } from '../lib/checkin';
 import { errorMessage } from '../lib/errors';
 import { pickPhoto, preparePhoto } from '../lib/photo';
-import { useSession } from '../lib/session';
+import { nextRoute, useSession } from '../lib/session';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, space, type } from '../theme';
 
 /** 인증샷 올리기: 지금 찍기(기본) / 앨범에서 고르기 → 날짜 판정 → 인증 완료 화면 */
 export default function Checkin() {
-  const { membership, session } = useSession();
+  const s = useSession();
+  const { membership, session } = s;
+  const focused = useScreenFocused();
   const [busy, setBusy] = useState<'camera' | 'album' | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  // 로그인·그룹 없이 주소로 바로 들어오면 갈 곳으로 보낸다 (버튼이 아무 반응 없던 문제)
+  if (focused && !s.loading && (!session || !membership)) return <Redirect href={nextRoute(s) as never} />;
 
   const go = async (mode: 'camera' | 'album') => {
     if (!membership || !session) return;

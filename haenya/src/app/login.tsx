@@ -46,7 +46,7 @@ export default function Start() {
   const f = family.trim();
   const g = given.trim();
   const ready = f.length >= 1 && f.length <= 5 && g.length >= 1 && g.length <= 10 && (!needPin || pin.length === 4) && (agreedBefore || allChecked);
-  const code = next?.startsWith('/join/') ? next.slice(6) : '';
+  const code = next?.startsWith('/join/') ? next.slice(6).split('?')[0] : '';
 
   const submit = async () => {
     if (!ready) return;

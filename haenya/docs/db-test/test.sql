@@ -60,6 +60,8 @@ select my_nudges_today(:'gid') as "오늘 찌른 사람";
 select * from send_group_nudge(:'gid') as "다 같이 찌르기(오늘 안 한 사람만)";
 select pg_temp.try(format('select send_group_nudge(%L)', :'gid')) as "다 같이 또";
 select my_nudges_today(:'gid') ->> 'all' as "다 같이 했음(true 기대)";
+select nudges_sent as "찌른 횟수(개인 2 + 얘들아 1 = 3)" from my_stats(:'gid');
+select pg_temp.try(format('delete from group_members where group_id = %L and user_id = auth.uid()', :'gid')) as "멤버 표 직접 삭제(ERR)";
 select pg_temp.as_user('c');
 select pg_temp.try(format('select send_nudge(%L, %L)', :'gid', pg_temp.uid('d'))) as "오늘 인증 안 한 사람 찌르기(CHECKIN_FIRST)";
 select pg_temp.try(format('select send_group_nudge(%L)', :'gid')) as "인증 안 하고 다 같이(CHECKIN_FIRST)";

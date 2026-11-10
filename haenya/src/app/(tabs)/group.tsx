@@ -76,7 +76,7 @@ export default function Group() {
   };
 
   const year = checkDate().slice(0, 4);
-  const annual = isAnnual(group?.weekly_goal);
+  const annual = isAnnual(board.length ? board[0].weekly_goal : group?.weekly_goal);
 
   const rankList = (
     <View>

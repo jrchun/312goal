@@ -34,7 +34,9 @@ export async function onRequestPost({ request, env }: Ctx): Promise<Response> {
   // 2) 사진 파일 삭제 (Storage API — SQL로는 못 지움)
   if (target.photo_paths.length) {
     await fetch(`${url}/storage/v1/object/checkins`, {
-      method: 'DELETE', headers, body: JSON.stringify({ prefixes: target.photo_paths }),
+      method: 'DELETE', headers,
+      // 큰 사진 + 작은 사진(…_t.jpg, src/lib/photos.ts의 thumbOf와 같은 규칙)
+      body: JSON.stringify({ prefixes: target.photo_paths.flatMap((p) => [p, p.replace(/\.jpg$/, '_t.jpg')]) }),
     });
   }
   // 3) 계정 삭제 (그룹장 넘기기 → auth 사용자 삭제 → 기록 함께 삭제)

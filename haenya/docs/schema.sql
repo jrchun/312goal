@@ -285,7 +285,8 @@ grant insert (id, nickname, avatar_url, terms_agreed_at, family_name, given_name
 grant update (nickname, avatar_url, terms_agreed_at, family_name, given_name)     on public.profiles to authenticated;
 grant update (name, weekly_goal, season_goal)            on public.groups to authenticated;
 grant update (season_goal)                               on public.group_members to authenticated;
-grant delete                                             on public.group_members to authenticated;
+-- group_members 직접 삭제는 막는다: 나가기는 leave_group()으로만 (그룹장 넘기기·내 인증 정리가 빠지지 않게)
+revoke delete on public.group_members from authenticated;
 grant delete                                             on public.checkins to authenticated;
 grant insert, delete                                     on public.reactions to authenticated;
 grant insert, update, delete                             on public.push_tokens to authenticated;
@@ -349,6 +350,12 @@ create policy reactions_delete on public.reactions for delete to authenticated
 drop policy if exists nudges_select on public.nudges;
 create policy nudges_select on public.nudges for select to authenticated
   using (public.is_group_member(group_id));
+
+-- group_nudges: 같은 그룹 조회(횟수 집계용). 생성은 send_group_nudge()로만
+drop policy if exists group_nudges_select on public.group_nudges;
+create policy group_nudges_select on public.group_nudges for select to authenticated
+  using (public.is_group_member(group_id));
+revoke insert, update, delete on public.group_nudges from anon, authenticated;
 
 -- season_results: 이어 붙인 그룹의 멤버만 조회
 drop policy if exists season_results_select on public.season_results;
@@ -694,7 +701,9 @@ language sql stable as $$
                   - coalesce(s.starts_on, date_trunc('year', t.d)::date) + 1))::int,
          me.streak_weeks,
          (select count(*)::int from public.nudges n where n.group_id = p_group_id and n.from_user = auth.uid()
-            and extract(year from n.nudge_date) = extract(year from t.d)),
+            and extract(year from n.nudge_date) = extract(year from t.d))
+         + (select count(*)::int from public.group_nudges n where n.group_id = p_group_id and n.from_user = auth.uid()
+            and extract(year from n.nudge_date) = extract(year from t.d)),   -- "얘들아"도 찌른 횟수
          (select count(*)::int from public.nudges n where n.group_id = p_group_id and n.to_user = auth.uid()
             and extract(year from n.nudge_date) = extract(year from t.d))
   from t cross join me left join s on true
@@ -729,6 +738,8 @@ language sql stable as $$
          (select count(*)::int from mw),
          (select count(*)::int from public.nudges n
            where n.group_id = p_group_id and n.nudge_date >= w.wk and n.nudge_date < w.wk + 7)
+         + (select count(*)::int from public.group_nudges n
+           where n.group_id = p_group_id and n.nudge_date >= w.wk and n.nudge_date < w.wk + 7)
   from w
 $$;
 
@@ -757,7 +768,8 @@ returns jsonb language sql stable as $$
     'photos', coalesce((select jsonb_agg(to_jsonb(c) order by c.created_at desc) from (
         select id, user_id, check_date, photo_path, date_verified, counted, created_at
         from public.checkins where group_id = p_group_id and user_id = auth.uid()
-        order by created_at desc limit 40) c), '[]'::jsonb)
+        -- 내 사진은 전부 보여준다(사용자 결정). 화면은 작은 사진 + 화면 가까이 올 때만 받기라 많아도 가볍다
+        order by created_at desc) c), '[]'::jsonb)
   )
 $$;
 

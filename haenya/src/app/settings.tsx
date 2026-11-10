@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
@@ -8,7 +8,8 @@ import { Screen } from '../components/Screen';
 import { deleteMyAccount, leaveGroup } from '../lib/account';
 import { errorMessage } from '../lib/errors';
 import { copyOrShareInvite } from '../lib/invite';
-import { useSession } from '../lib/session';
+import { nextRoute, profileComplete, useSession } from '../lib/session';
+import { useScreenFocused } from '../lib/useScreenFocused';
 import { supabase } from '../lib/supabase';
 import type { RestoreCandidate } from '../lib/types';
 import { color, line, space, type } from '../theme';
@@ -18,6 +19,7 @@ type Msg = { text: string; tone: 'info' | 'error' } | null;
 /** 설정 — 닉네임, 내 올해 목표, (그룹장) 그룹 설정, 초대 링크, 로그아웃, 그룹 나가기, 회원 탈퇴 */
 export default function Settings() {
   const s = useSession();
+  const focused = useScreenFocused();
   const m = s.membership;
   const g = m?.group;
   const uid = s.session?.user.id;
@@ -68,6 +70,8 @@ export default function Settings() {
 
   // 저장 버튼은 바꾼 칸 아래에만 나타난다 (사용자 확정 2026-11-10)
   const nameChanged = family.trim() !== (s.profile?.family_name ?? '') || given.trim() !== (s.profile?.given_name ?? '');
+
+  if (focused && !s.loading && (!s.session || !profileComplete(s))) return <Redirect href={nextRoute(s) as never} />;
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/my'));
 
@@ -188,7 +192,7 @@ export default function Settings() {
                   }}
                 />
               ) : (
-                <Text style={type.caption}>카카오 계정</Text>
+                <Text style={type.caption}>{mm.claimable ? '아직 안 들어옴' : '카카오 계정'}</Text>
               )}
             </View>
           ))}

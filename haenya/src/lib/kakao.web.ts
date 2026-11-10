@@ -106,9 +106,14 @@ export async function shareCardToKakao(o: {
     pending = {
       preview,
       send: () => {
-        send(); // 누른 순간 그대로 (await 없이)
-        done();
-        resolve();
+        try {
+          send(); // 누른 순간 그대로 (await 없이)
+          done();
+          resolve();
+        } catch (e) {
+          done(); // 보내다 오류가 나도 창은 닫는다 → 부른 쪽이 문장 공유로 넘어간다
+          reject(e);
+        }
       },
       cancel: () => {
         done();
