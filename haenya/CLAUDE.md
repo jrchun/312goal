@@ -1,0 +1,261 @@
+# 했냐 (HAENYA)
+
+@AGENTS.md
+
+## 답변 언어 (가장 중요)
+
+- 사용자에게 하는 답변은 **반드시 한국어**로 쓴다. 영어로 답하지 않는다.
+- 전문 용어는 쉬운 말로 풀어서 설명하고, 필요하면 예시를 든다. 사용자는 개발 지식이 많지 않다.
+- 코드·파일명·명령어는 그대로 두되, 무엇인지 한국어로 덧붙인다.
+
+친구 그룹 운동 인증 + 서로 찌르기 서비스. 2027-01-01 웹(PWA) 오픈, 이후 같은 코드로 iOS/안드로이드.
+원본 문서: "했냐 MVP 개발 지시서"(Claude Docs), "했냐 디자인 가이드라인 v0.1"(PDF, 2026.11).
+
+## 스택과 원칙
+
+- Expo SDK 58 + Expo Router(`src/app/`) + TypeScript. Supabase(Auth/DB/Storage). 웹은 `expo export --platform web` 정적 결과(`dist/`)를 Cloudflare Pages에 배포.
+- 비즈니스 규칙(하루 1회, 날짜 판정, 찌르기 제한, 12명 제한)은 반드시 Supabase DB 함수와 RLS에 둔다. 화면은 얇게.
+- 플랫폼별로 다른 코드(카카오 공유, 이미지 저장)는 `*.web.ts` / `*.native.ts`로 분리.
+- 시간대는 항상 Asia/Seoul. 하루 기준은 새벽 3시(03:00 이전은 전날). 그래서 주간 리셋도 실제로는 월요일 03시(사용자 확인 완료).
+- Supabase는 새 프로젝트. 기존 312goal(저장소의 `312goal/` 폴더, 옛 Supabase 프로젝트)과 완전히 별개 — 섞지 않는다.
+- 사용자는 개발 지식이 많지 않다. 각 작업 끝에 직접 확인하는 방법을 한국어로 알려줄 것.
+- 이 환경에서는 api.expo.dev가 막혀 있어 `npx expo install`은 `EXPO_OFFLINE=1`을 붙여 실행한다.
+
+## 라우트
+
+| 경로 | 파일 | 단계 |
+|---|---|---|
+| `/` 일반 랜딩 | `src/app/index.tsx` | STAGE 7 |
+| `/join/[code]` 초대 랜딩 | `src/app/join/[code].tsx` | STAGE 3 |
+| `/login` 시작하기: 성·이름·4자리·약관 (기기 등록) | `src/app/login.tsx` | STAGE 3 |
+| `/restore` 나 이미 있어: 이름 + 4자리로 되찾기 | `src/app/restore.tsx` | STAGE 3 |
+| `/auth/kakao` 카카오 로그인 후 돌아오는 곳 (보조) | `src/app/auth/kakao.tsx` | STAGE 3 |
+| `/joined` 그룹 합류 확인 + 내 올해 목표 | `src/app/joined.tsx` | STAGE 3 |
+| `/terms` `/privacy` 약관 (초안은 STAGE 8) | `src/app/terms.tsx`, `privacy.tsx` | STAGE 3·8 |
+| `/create-group` | `src/app/create-group.tsx` | STAGE 3 |
+| `/onboarding` 0번째 인증, 홈 화면 추가 안내 | `src/app/onboarding.tsx` | STAGE 7 |
+| `/home` `/group` `/my` (탭) | `src/app/(tabs)/` | STAGE 4·6 |
+| `/checkin` 인증샷 (모달) | `src/app/checkin.tsx` | STAGE 4 |
+| `/checkin-done` 인증 완료 + 스티커 카드 | `src/app/checkin-done.tsx` | STAGE 5 |
+| `/settings` | `src/app/settings.tsx` | STAGE 6 |
+
+`public/_redirects`가 `/join/*`을 `/join/[code]`로 돌린다(Cloudflare Pages).
+
+로그인 = **기기 등록 + 이름·숫자 4자리로 되찾기** (사용자 확정 2026-11-09. 카카오 로그인은 나중에 확대용으로 남김):
+- 시작하기(`/login`): 성·이름·숫자 4자리·약관 한 화면 → `registerDevice()`(`src/lib/device-auth.ts`): `/api/register`가 가짜 이메일(무작위@users.haenya.app)+비밀번호를 주고 `supabase.auth.signUp`. 이 브라우저는 계속 자동 로그인.
+- 다른 그룹 계정으로 로그인된 채 초대 링크를 열면: 막지 않고 이 그룹 동그라미를 보여준다 → 누르면 이 브라우저에서만 로그아웃(`signOut({scope:'local'})`) 후 내 자리로.
+- 초대 링크 화면에 멤버 이름 동그라미가 바로 보인다 → 누르면 `/restore?code=&user=`로 숫자 입력, 4자리를 다 누르면 자동으로 들어간다.
+- 나 이미 있어(`/restore?code=`): 초대 코드로 멤버 목록(`restore_candidates`) → 이름 고르고 4자리 → `/api/restore`가 DB `verify_pin`(5번 틀리면 15분 잠금)으로 확인 → 같은 비밀번호를 다시 만들어 `signInWithPassword`.
+- 비밀번호 = HMAC-SHA256(Cloudflare Secret `HAENYA_AUTH_SECRET`, 이메일). **⚠️ 이 Secret을 바꾸면 모든 사용자의 되찾기가 깨진다. 절대 바꾸지 말 것.**
+- 숫자 4자리는 `user_pins`(bcrypt, 앱에서 직접 접근 불가). 그룹장이 `reset_member_pin`으로 임시 숫자 발급 → 그 멤버는 들어오면 새 숫자를 정해야 한다(`is_temp`).
+- 이름은 성(`family_name`)·이름(`given_name`) 따로. 화면·찌르기에는 이름만(`displayName()`, 보드의 nickname = 이름). `nickname`은 성+이름 전체.
+- Supabase 설정: 이메일 로그인 ON, **"Confirm email" OFF** 여야 가입이 된다(사용자가 대시보드에서).
+- 같은 휴대폰이라도 카톡 브라우저·Safari·홈 화면 아이콘은 저장소가 따로라 각자 처음 한 번 되찾기가 필요하다. 기기 특징으로 추측해 자동 연결(핑거프린팅)은 하지 않는다(오인식·개인정보).
+- **미리 만든 멤버 자리**(2026-11-10~): 운영자가 만든 계정(`profiles.is_placeholder`, 숫자 없음). 초대 링크 동그라미 → "처음 왔다" + [나 맞다] → `/api/claim`(`functions/api/claim.ts`, DB `claim_account`: 초대 코드 + 그 그룹의 숫자 없는 미리 만든 자리일 때만) → 로그인 → 프로필 미완성이라 `/login`에서 성·이름·숫자·약관. 숫자를 정하면(`set_my_pin`) 자리 표시가 풀리고 이후엔 보통 되찾기. 만들 때는 실서버 `/api/register` + Supabase signUp(비밀값을 몰라도 됨) 후 SQL로 is_placeholder·group_members.
+- 카카오(예전 방식, 보조): `signInWithKakao`(`src/lib/auth.web.ts`) → `/auth/kakao` → `functions/api/kakao-token.ts` → `signInWithIdToken`. 되찾기 화면에서 카카오 계정만 "카카오로 이어가기"로 쓴다.
+`/api/*`는 Cloudflare에서만 돌아서 로컬 `npm run web`으로는 가입·되찾기를 끝까지 테스트할 수 없다(배포 주소에서 테스트).
+프로필 미완성(약관·성이름·4자리, 임시 숫자) → `/login`, 초대 링크로 왔으면 → `/join/[code]`(자동 합류 → `/joined`), 그룹 있으면 `/home`, 없으면 `/create-group`.
+**주의(실제 서버 전체 점검에서 찾은 문제):**
+- 스택 아래 깔린 화면도 로그인 상태가 바뀌면 다시 그려진다 → `<Redirect>`는 반드시 `useScreenFocused()`가 true일 때만(`src/lib/useScreenFocused.ts`). 안 그러면 가입 순간 첫 화면이 /login으로 보내 버린다.
+- `SessionProvider`는 겹친 읽기 중 **마지막 요청만** 반영한다(가입 직후의 느린 "미완성" 읽기가 늦게 도착해 덮어쓰던 문제).
+- 전체 점검 스크립트(실서버, 아이폰 화면 흉내): 가입→그룹 만들기→0번째 인증→인증샷→스토리 카드→초대 합류→반응→되찾기(틀림/맞음)→그룹장 초기화→임시 숫자→새 숫자→탈퇴. 테스트 계정은 성 '테'로 만들고 끝나면 `delete_user_account`로 지운다.
+로그인 상태·프로필·내 그룹은 `useSession()`으로 읽는다. 탭 화면은 로그인+약관+그룹이 없으면 들어올 수 없다.
+
+## 디자인 규칙 (가이드라인 요약)
+
+**토큰은 `src/theme.ts`만 쓴다.** 하드코딩한 색·폰트·크기 금지. 새 값이 필요하면 theme.ts에 먼저 추가.
+
+컨셉: 크게. 단호하게. 놀리듯이. 단톡방 한마디를 화면으로 옮긴 꾸미지 않은 포스터. **한 화면, 한 문장** — 모든 화면은 한 문장으로 요약돼야 한다. 새 화면 검사 질문: "오늘 했냐?"에 바로 답할 수 있는가.
+
+- 색: 크림 70 · 검정 20 · 빨강 10. 빨강은 화면에서 가장 중요한 한 곳에만("했냐?", "했다.", 찌르기).
+  - 빨강 `#E0361C` 글자는 크림 위 24px 이상만. 작은 빨간 글자는 `textRed #C4250F`.
+  - 회색 `#9A948A`은 24px 이상(큰 숫자의 남은 부분 `/3`, 취소선 이름). 작은 보조 문구는 `bodyGray #5E5950`.
+  - 순백(#FFF) 바탕 금지, 항상 크림. 파랑·초록 등 다른 강조색 금지. 빨강 바탕에 빨강 계열 금지.
+- 글꼴: Black Han Sans(제목·숫자·버튼, 굵기 1종) + Gothic A1(본문 400/600/800). 한 화면에서 가장 큰 글자와 가장 작은 글자 차이 10배 이상. 중간 크기만 나열하면 실패.
+  - 헤드라인 150px·행간 0.85·자간 -4% / 진행 숫자 92px / 순위 이름 32px / 버튼 20–22px / 문장 Gothic 800 15px / 섹션 라벨 Gothic 800 12px 자간 2px / 보조 Gothic 600 12px.
+- 레이아웃: 설계 기준 390×844, 웹/데스크톱은 가운데 정렬 + 양옆 크림. 좌우 여백 20px, 간격 4의 배수. 큰 구획 6px 검정 선, 순위 행 1.5px 선. 헤드라인은 화면 폭을 넘칠 만큼 크게, 왼쪽 정렬. 버튼은 화면 아래쪽. 터치 영역 최소 44px.
+  - 상단 한 줄: 그룹명 · 주차. 최상단 가장 큰 요소 1개. 주 버튼 화면당 1개. 하단 메뉴: 홈 · 그룹 · 마이 — 휴대폰 밝게/어둡게 설정을 따른다(사용자 요청 2026-11-10, 주소창과 어울리게): 밝게=크림 바(화면과 사이 선 없음)+지금 탭 검정 블록, 어둡게=검정 바. 웹은 메뉴 아래 띠(html 배경)도 같은 색. `app.json` userInterfaceStyle automatic.
+- 모서리 0, 그림자 0, 그라데이션 0. 둥근 카드 반복 금지. 일러스트·캐릭터·이모지 장식 금지.
+- 강조는 이 셋만: 빨강 블록(가장 중요한 행동 하나), 형광펜 밑줄 `#F3C8BE`(나 자신), 빨간 취소선(무소식 친구).
+- 버튼: 주(검정 블록·크림 글자·→) / 보조(검정 테두리) / 찌르기(빨강 블록·검정 글자, 무소식 친구 옆에만). `src/components/Button.tsx`.
+- 순위 행 3상태: 기본 / 나(형광펜) / 무소식 3일 이상(회색 취소선 + "N일째 무소식" + 찌르기).
+- 앱 아이콘(사용자 확정, 시안 C): 빨강 바탕 + 약올리는 남자 얼굴(곁눈질·치켜올린 눈썹·메롱). 원본 `assets/brand/icon.svg`, 카카오용 `assets/brand/kakao-icon-128.png`. 화면 안에서는 여전히 일러스트 금지 — 아이콘만 예외.
+- 이름 동그라미(사용자 확정): 되찾기용 멤버 아이콘은 원형(`NameCircle`, `MemberCircles`) — "모서리 0" 원칙의 예외. 검정 원 + 크림 이름, 카카오 계정은 테두리만.
+- 워드마크: "했냐?"(물음표까지 로고), 최소 22px, 사방 여백 "했" 폭의 절반 이상. 윤곽선·그림자·기울여 늘리기·다른 글꼴 금지. 문장 속 서비스명은 물음표 없이 "했냐".
+
+### 스티커 (인증샷 위 정보)
+
+사진과 섞이지 않게 단색 블록 스티커. 기울기 -6°~+3°, 7개 이하. 사진 위 반투명 글자 금지.
+
+| 스티커 | 스타일 | 위치/규칙 |
+|---|---|---|
+| 했다. | 빨강 · -5° | 가장 큼, 화면 폭 60% 이상 |
+| 2/3 | 검정 · 0° | 이번 주 진행, "했다." 바로 아래 |
+| 성우, 이번 주 두 번째 | 크림 · +2° | 이름과 한 줄 메모 |
+| 했냐? | 크림 · -3° | 왼쪽 위 고정, 로고 |
+| 운동 4인방 · W02 | 검정 · 0° | 오른쪽 위, 그룹과 주차 |
+| 1월 14일 목 · 7:42 | 크림 · 0° | 왼쪽 아래, 날짜 없으면 "날짜 미확인" |
+| 너도 했냐 → | 빨강 · 0° | 오른쪽 아래, 외부 공유용 유입 문구 |
+
+### 공유 카드
+
+| 카드 | 크기 | 채널 | 규칙 |
+|---|---|---|---|
+| 재촉 카드 | 1200×1200 | 카톡 | 빨강 바탕 전체 + "○○야 했냐?". 대상 이름·주간 횟수·무소식 일수 가능(그룹 내부). 아래 띠는 "했냐고."(로고 대신 한 번 더 재촉, 사용자 결정. 카톡 메시지에 했냐 아이콘·버튼이 따로 있음) |
+| 나 했다 카드 | 1200×1200 | 카톡 | 스토리·인증과 같은 구성, 정사각형 |
+| 스토리·인증 | 1080×1920 | 인스타 | 본인 기록만. 다른 멤버 이름·수치 금지 |
+| 스토리·주간 결산 | 1080×1920 | 인스타 | 검정 바탕. 그룹 합계만, 뒤처진 멤버 비노출 |
+
+모든 외부 카드 아래 띠에 워드마크 + 유입 문구("너도 했냐", "너네 그룹도 했냐").
+
+### 문구 (친구한테 하는 말투)
+
+반말, 짧게, 마침표로 끊는다. 놀리는 대상은 "안 한 행동"이지 사람이 아니다. 망신은 그룹 안에서만.
+
+| 상황 | 이렇게 | 이렇게 쓰지 않는다 |
+|---|---|---|
+| 홈 인사 | 성우. 이번 주 아직 두 번. | 안녕하세요 성우님! 오늘도 화이팅하세요 :) |
+| 인증 완료 | 했다. 한 번 남았다. | 인증이 성공적으로 완료되었습니다. |
+| 무소식 | 5일째 무소식 | 민지님은 운동을 하지 않고 있습니다 |
+| 재촉 카드 | 민지야 했냐? 다들 기다리는 중. | 외모·성격 비난 |
+| 과거 사진 거절 | 오늘 찍은 사진만 된다. | 오류가 발생했습니다 (코드 403) |
+| 날짜 미확인 | 날짜 미확인 | 부정 인증이 의심됩니다 |
+| 하루 중복 | 오늘은 이미 했다. 사진만 저장할게. | 하루 1회만 인증 가능합니다. |
+| 초대 | 너도 했냐? | 지금 가입하고 건강한 습관을 만들어보세요! |
+
+쓰는 것: 마침표, 반말, 숫자, 이름. 줄이는 것: 느낌표, 존댓말, "~하세요". 쓰지 않는 것: 이모지, 외모·체중 언급, 욕설.
+
+## 인증샷 (STAGE 4)
+
+- 흐름: `pickPhoto`(지금 찍기=capture / 앨범) → `preparePhoto`(`src/lib/photo.web.ts`: EXIF 촬영 시각 읽기 → 긴 변 1600px JPEG로 다시 그림) → `submitCheckin`(`src/lib/checkin.ts`: 오늘 사진인지 먼저 거름 → Storage 업로드 → `submit_checkin` → 거절되면 사진 삭제) → `/checkin-done`.
+- canvas로 다시 그려서 **EXIF가 전부 빠진다(GPS 포함)**. 테스트로 확인함. EXIF 읽기는 `exifr/dist/lite.esm.mjs` — lite는 `pick` 옵션을 쓰면 오류가 나니 쓰지 말 것.
+- **실기기 확인(2026.11, 아이폰 카톡·Safari):** "지금 찍기" 사진은 아이폰이 촬영 시각·위치를 지워서 넘긴다. 앨범 사진은 EXIF(촬영 시각·위치)가 그대로 온다.
+  → 카메라 모드 + EXIF 날짜 없음 + 파일 생성 시각(lastModified)이 10분 안이면 그 시각을 촬영 시각으로 쓴다(`takenAtSource: 'capture'`). 앨범인데 EXIF 없으면 "날짜 미확인".
+- 진단용 숨은 화면 `/debug/photo`: 고른 사진의 메타정보를 서버에 보내지 않고 보여준다.
+- 날짜 계산은 `src/lib/dates.ts`(DB와 같은 규칙). 화면·사전 확인용이고 최종 판정은 DB.
+- 홈은 `group_week_board`를 화면에 올 때마다 다시 읽는다(useFocusEffect). 이번 주 순위는 이번 주 횟수 순, 그룹 탭은 최근 4주 순위.
+- 찌르기는 지금 문장+링크 공유. 재촉 카드 이미지는 STAGE 5. 앱(native)의 사진·로그인은 2단계.
+
+## 공유 카드 (STAGE 5)
+
+- 카드는 canvas로 직접 그린다(`src/lib/cards.web.ts`): 인증 스토리 1080×1920(`makeStoryCard`), 나 했다 1200×1200(`makeDidSquareCard`), 재촉 1200×1200(`makeNudgeCard`). 글꼴은 그리기 전에 `document.fonts.load`로 불러온다.
+- 카톡: Kakao JS SDK 2.8.4(`src/lib/kakao.web.ts`, integrity 고정) → `Share.uploadImage`로 카드 올림 → `Share.sendDefault` 피드. 링크는 `/home`. 키는 `EXPO_PUBLIC_KAKAO_JS_KEY`(공개 값).
+  카카오 콘솔: JavaScript SDK 도메인 + **제품 링크 관리 → 웹 도메인**에 사이트 주소가 있어야 한다.
+- **사파리 등 카톡 밖 브라우저:** 카드 만들기·올리기를 기다린 뒤 `sendDefault`를 부르면 "사람이 누른 순간"이 지나 아이폰이 카톡을 못 열고 talk-apps.kakao.com "카카오톡이 실행되지 않나요?" 화면이 뜬다(사용자 제보 2026-11-10).
+  → 준비가 끝나면 `KakaoSendSheet`("카드 준비됐다." + 미리보기 + [카톡으로 보내기])를 띄우고, 그 버튼을 누르는 순간 바로 `sendDefault`(`src/lib/kakao.web.ts`의 `kakaoPendingStore`). 카톡 안 브라우저(UA에 KAKAOTALK)는 문제없어서 바로 보낸다. 취소하면 `Error('CANCELLED')`.
+  다른 창(찌르기 창 등) 위에 띄우면 뒤에 숨으니, 먼저 그 창을 닫는다.
+- 인스타: Web Share API로 파일 공유(`src/lib/share.web.ts`), 안 되면(카톡 인앱 등) `SaveImageSheet`로 이미지를 띄우고 "길게 눌러 저장" 안내.
+- 이름 부르기는 받침에 따라 `callName()`(민지야/고은아), 순서는 `ordinalWord()`(첫/두/세 번째) — `src/lib/korean.ts`.
+
+## 그룹·마이·설정 (STAGE 6)
+
+- 그룹 탭: `group_week_board`(순위 = rank) + 이번 주 checkins + 서명 URL(`src/lib/photos.ts`, 1시간) + reactions(본인만 넣고 뺌). 사진 누르면 `PhotoViewer`.
+- 마이 탭: `my_stats`, `my_weeks`(52칸, 가입 전 주는 흐리게), 내 사진 → 눌러서 지우기(`deleteCheckin`). 내 사진은 전부 보여준다(사용자 결정: 쌓이는 게 보상).
+- **작은 사진**(2026-11-10~): 인증할 때 긴 변 480px `…_t.jpg`(`thumbOf`)도 같이 올리고, 격자·작은 줄은 그걸 `LazyImage`(웹: `<img loading="lazy">`, 화면 가까이 올 때만 받음)로. 작은 사진이 없는 예전 인증은 큰 사진으로 대신. 지울 때 둘 다 지운다.
+- 설정: 닉네임·내 올해 목표·(그룹장) 그룹 설정·초대 링크·로그아웃·그룹 나가기·회원 탈퇴. 위험한 동작은 두 번 눌러야 실행. 저장 버튼은 바꾼 칸 아래에만 나타난다.
+- 삭제 순서: **사진 파일 먼저(Storage API) → DB 함수**(`src/lib/account.ts`). Supabase는 SQL로 storage.objects를 못 지우게 막는다(protect_objects_delete).
+- DB: `leave_group`, `delete_my_account`(사용자용) / `release_membership`, `delete_user_account`, `kakao_unlink_target`(내부·서버 전용, authenticated 실행 권한 회수). 그룹장이 나가면 다음 멤버에게, 마지막이면 그룹 삭제.
+- **주의:** Supabase는 새 함수에 authenticated 실행 권한을 자동으로 준다 → 내부용 함수는 schema.sql 끝의 revoke 목록에 꼭 추가.
+- 카카오 연결 해제 웹훅: `functions/api/kakao-unlink.ts`. Cloudflare Secret `KAKAO_ADMIN_KEY`, `SUPABASE_SERVICE_ROLE_KEY` + 카카오 콘솔 웹훅 URL `https://haenya.pages.dev/api/kakao-unlink` 이 있어야 동작(없으면 503).
+
+## 온보딩·결산·미리보기 (STAGE 7)
+
+- 합류 직후(`/joined` → `/onboarding`), 그룹 만든 직후(만들었다 → 다음): 0번째 인증 — `public/sample-checkin.jpg`로 스티커 카드 체험, DB 기록 없음.
+- **홈 화면 추가 안내는 넣지 않는다**(사용자 결정 2026-11-10: 앱 단계에서 다룬다. 아이폰은 웹이 버튼으로 홈 화면에 추가할 방법이 없음). 안내 화면·이어가기 링크 화면은 지웠다.
+  DB의 `create_transfer_token`/`redeem_transfer_token`(1회용 이어가기 열쇠)은 앱 단계에서 쓸 수 있게 남겨둠(지금 앱에서 안 씀).
+- 웹 앱 설정 파일 `/api/manifest`(이름·아이콘·색, 시작 주소 /home)와 애플 웹앱 메타 태그는 그대로(브라우저 메뉴로 직접 추가하는 사람용).
+- 월요일 홈 맨 위: 지난주 결산(`group_week_summary`) + 주간 결산 스토리 카드(`makeWeeklyCard`, 검정 바탕, 그룹 합계만).
+- 링크 미리보기: `+html.tsx`의 og 태그 + `public/og.png`(1200×630). 카톡은 미리보기를 캐시하니 바꾸면 카카오 "공유 디버거"로 캐시를 지워야 한다.
+
+## 배포 마무리 (STAGE 8)
+
+- 약관·개인정보처리방침 정식 초안: `src/app/terms.tsx`, `privacy.tsx`(시행일 2027-01-01). 책임자 천성우 / jrchun1@naver.com(사용자 확정). 오픈 전 전문가 검토 권장.
+- DB 휴면 방지: `.github/workflows/haenya-keepalive.yml`(매일 06:17 KST, 공개 키로 읽기 1회). GitHub 예약 실행은 **main에 이 파일이 있어야** 돈다.
+- **312goal 2026 이어서 시험하기(사용자 결정 2026-11-10, 앞의 "이관 안 함"을 바꿈):** 그룹 `312_2026`(초대 코드 FB8SHE98, 주 3회)에 미리 만든 자리 5개(천·호·밤·혁·고, 천이 그룹장). 옛 사이트 누적(11-10 기준 천115·호108·밤106·혁58/120·고37)을 `season_results`(group_id·user_id 연결)에 두고 **시즌 누적 = 이전 기록 + 했냐 인증**(`group_week_board`, `submit_checkin`이 그 해 season_results를 더함). 2027년엔 자동으로 0부터. 날짜 기록은 없어서 52주 칸·4주 순위는 넘어온 날부터.
+- **"주간 목표 없음" 그룹 옵션(사용자 결정 2026-11-10):** `groups.weekly_goal` null = 연간 목표만(설정 → 그룹 설정 체크). 옛 312goal처럼: 순위 = 각자 올해 목표 대비 %(DB rank), 홈 큰 숫자 = 올해 누적/목표 + "연도 대비 N회 앞섰다/모자라다"(`src/lib/season.ts`, 오늘까지 있어야 할 횟수 = 목표×경과일/365), 52주 칸 = 한 번이라도 한 주, 스티커·카드 숫자 = 올해 누적/목표, 주간 결산 카드는 숨김. 312_2026이 이 모드.
+- 속도: DB 서버 preconnect + 글꼴 CSS가 첫 화면을 막지 않게(`media=print` → 다 받으면 `all`, 인라인 스크립트로 전환. React는 문자열 onLoad를 지우므로 쓰지 말 것).
+
+## 전체 점검에서 고친 것 (2026-11-10) — 다시 만들지 말 것
+
+- **로그인 상태 읽기 실패 ≠ 프로필 없음**(`src/lib/session.tsx`): 프로필·그룹·숫자 중 하나라도 못 읽으면 "미완성"으로 치지 않고 다시 읽는다(읽을 때까지 "불러오는 중"). 예전엔 인터넷이 잠깐 끊기면 멀쩡한 계정이 이름·숫자 다시 정하는 화면으로 갔다.
+- **로그아웃은 이 브라우저만**(`signOut({ scope: 'local' })`): 기본값은 모든 기기 로그아웃이라 Safari에서 나가면 카톡 브라우저도 풀렸다. 계정을 바꿀 때는 `s.signOut()`을 기다린 뒤 이동(안 그러면 다음 화면이 예전 계정으로 튕긴다).
+- **빈 자리가 있는 그룹**: 로그인한(그룹 없는) 사람이 초대 링크로 와도 바로 새 멤버로 넣지 않고 "혹시 이 중에 너 있어?"를 먼저 묻는다(같은 사람이 둘 되는 것 방지). 초대 화면에서 "처음이야. 참여하기"로 가입한 사람은 `?fresh=1`로 돌아와 바로 합류.
+- DB: 내 사진 40장 제한 제거(전부 보여주기로 한 결정과 어긋났음) / `group_members` 직접 삭제 권한 회수(나가기는 `leave_group`으로만 — 그룹장 넘기기·인증 정리) / 찌른 횟수·주간 결산에 "얘들아"도 포함(`group_nudges` 조회 정책 추가).
+- 카카오 연결 해제 웹훅도 작은 사진(`_t.jpg`)까지 지운다. 큰·작은 사진은 동시에 올린다. `/settings`·`/checkin`은 로그인 없이 주소로 들어오면 갈 곳으로 보낸다.
+
+## 탭 이동 속도 (사용자 요청으로 개선)
+
+- 탭마다 **요청 1번**: `group_tab(gid)`, `my_tab(gid)`(jsonb 묶음, security invoker라 RLS 그대로) → `src/lib/tabData.ts`.
+- **임시 저장**(`src/lib/cache.ts`): 다시 열면 바로 그리고 뒤에서 새로 받는다(`useCache` + `fetchInto`). 로그아웃·탈퇴 시 비움.
+- **사진 주소 재사용**(`src/lib/photos.ts`): 서명 URL을 50분 재사용 → 다시 열어도 사진이 깜빡이거나 다시 내려받지 않음.
+- 홈이 뜨면 `router.prefetch('/group'|'/my')` + 두 탭 데이터를 미리 받아 둔다.
+- 처음 받기 전에는 0 같은 가짜 숫자 대신 "불러오는 중."을 보여준다.
+- 측정(실서버): 탭 내용 0.02~0.06초, 사진 0.02~0.08초 (전에는 1.2~3.4초 + 사진 깜빡임).
+
+## 탭 스크롤 최소화 (사용자 확정 2026-11-10)
+
+- 목표: 그룹이 꽉 차도(12명·사진 20장) 탭마다 한 화면.
+- 홈: 이번 주 순위 **최대 4줄**(상위 4명, 내가 밖이면 상위 3명 + 나) + "외 N명 더 보기" → 그 자리에서 펼침(같은 이번 주 기준, 그룹 탭 4주 순위로 보내지 않음). 순위 줄 높이 44px.
+- 찌르기: 무소식 기준이 아니라 **오늘 아직 안 한 멤버 중에서 직접 고른다**(홈 빨강 버튼 → `PokePicker`). 하루 1번 제한은 DB. 3일 이상 무소식 취소선 표시는 그대로.
+  - 제한은 **같은 사람에게 하루 1번**(`nudges` unique). 다른 사람은 각각 따로 찌를 수 있다. 찌르기 창을 열 때 `my_nudges_today(gid)`로 오늘 찌른 사람을 읽어 "찔렀다" 표시(새로고침해도 유지).
+  - **오늘 내가 인증해야 찌를 수 있다**(사용자 결정 2026-11-10): `send_nudge`·`send_group_nudge`가 오늘 인정 인증이 없으면 `CHECKIN_FIRST`. 홈은 인증 전엔 빨강 버튼 대신 "너부터 인증하면 찌를 수 있다."
+  - **기록은 실제로 보냈을 때만**(사용자 제보 2026-11-10): 카드 준비 → [카톡으로 보내기]를 눌러 보낸 뒤에 `send_nudge`/`send_group_nudge`. 취소·공유 창 닫기 = "안 보냈다. 안 찔렀다."(기록 없음). 카톡 앱 안에서 대화방 고르기를 취소한 것까지는 알 수 없다.
+  - 찌르기·"나 했다" 카톡 링크는 `/home`이 아니라 **그룹 초대 주소** `/join/{code}`: 이미 그 그룹이면 바로 홈으로, 카톡 브라우저에 다른 그룹(예전) 계정이 남아 있으면 내 자리 고르기(사용자 제보: 예전 그룹 화면이 뜸).
+  - 맨 위 **"얘들아"(다 같이 찌르기, 사용자 요청 2026-11-10)**: 오늘 안 한 사람 전부를 한 장으로 — 단톡방용. `send_group_nudge(gid)`, 한 사람이 그룹마다 하루 1번(`group_nudges` 표, 사람별 찌르기와 따로 셈). 카드: "얘들아 했냐?" + "N명 · 오늘 아직 안 했다. 이름들"(길면 "외 N명").
+- 그룹 탭: **A안** — 그룹 이름 아래 [순위] [이번 주 사진 N] 전환, 사진 4칸 격자, 초대는 오른쪽 위 "초대 →".
+
+## 그룹 소식 (사용자 결정 2026-11-10)
+
+- 그룹에서 일어난 일을 한 줄씩: **재미**(인증 "했다. 올해 N번째. 찔리고 N시간 만에", 찌르기 "이번 주 N번째", 얘들아, 50회마다, 목표 달성, 순위 역전, 3·7·14·30일째 무소식) + **감시**(그룹장의 숫자 초기화=빨간 글씨, 올해 목표 변경, 인증 삭제, 날짜 미확인, 이름 변경, 그룹 이름·주간 목표 변경, 합류·나감·그룹장 변경·빈 자리 첫 입장).
+- 위치: 그룹 탭 [순위] [사진 N] [소식] + 홈 맨 아래 최신 2줄(누르면 그룹 탭 소식. 홈 여백을 줄여 한 화면에 맞춤).
+- **기록은 DB가 남긴다**(`group_events`, `log_event` — 함수·트리거 안에서. 앱은 못 쓰고, 아무도 못 지운다). 이름은 그때 이름을 `data`에 같이 저장. 문장은 `src/lib/feed.ts`의 `feedText`(새 종류를 DB에 추가하면 여기도. 모르는 종류는 건너뜀).
+- 읽기 `group_feed(gid)`: 읽을 때 무소식 줄을 빠진 만큼 채운다(예약 작업이 없어서. 그 날 새벽 3시 시각으로 적고 `dedupe`로 중복 방지). 아직 아무도 안 들어온 자리는 무소식에서 뺀다.
+- 주의: 나가기·그룹 삭제로 한꺼번에 지워지는 인증은 "인증 삭제"로 적지 않는다(`haenya.bulk` 표시 + 그룹이 없으면 `log_event`가 그냥 돌아옴 — 안 그러면 그룹 삭제가 오류로 막힌다).
+- 당사자에게 따로 알림은 없음(소식에만 — 사용자 결정). 만들기 전 일은 채우지 않음.
+
+## 사진 보기 (사용자 확정 2026-11-11)
+
+- `PhotoViewer`(사진 앨범 방식): 사진을 화면 전체(잘리지 않게)에. 바탕은 휴대폰 밝게/어둡게 설정을 따른다(밝게=크림·검정 글자, 어둡게=검정·크림 글자 — 주소창과 같은 색). 위 가운데 이름(굵게)·날짜(작게), 오른쪽 위 작은 ✕. 큰 버튼 없음.
+  - 목록 전체(`photos`)와 누른 사진(`startId`)을 넘긴다. 그룹 탭 = 이번 주 사진 전체, 마이 탭 = 내 사진.
+  - 좌우로 밀어 앞뒤 사진: 가로 ScrollView `pagingEnabled`(웹에서는 브라우저 기본 scroll-snap → 손가락 따라 부드럽다). 앞뒤 2장만 실제로 그림.
+  - 아래 작은 사진 줄(36×48): 지금 사진은 크림 테두리, 자동으로 가운데로. 누르면 그 사진으로. 컴퓨터는 ←/→·Esc.
+  - 아이폰 흉내 터치 테스트로 확인: 밀면 정확히 한 장씩 맞춰 멈춘다.
+- 내 사진(마이 탭)이면 아래 작은 글자 "이 인증 지우기" → 한 번 더 눌러야 지움. 지워도 보기는 그대로(다음 사진이 그 자리에), 마지막 한 장이면 닫힘.
+- **이모지 반응은 화면에서 뺐다.** DB `reactions` 표와 `group_tab`의 reactions 칸은 남아 있음(나중에 다시 쓸 수 있게).
+
+## DB (Supabase)
+
+- 프로젝트: `https://hfnwadutbowgxrosnypz.supabase.co`. 스키마는 `docs/schema.sql` 하나(재실행 안전).
+- **DB 반영은 Claude가 직접 한다**: `bash scripts/db-apply.sh`(schema.sql 전체 적용), `bash scripts/db-apply.sh "select ..."`(확인용 SQL).
+  Supabase 관리 API(api.supabase.com)를 쓰고, 토큰은 Claude 작업 환경("312goal")에 저장돼 프록시가 자동으로 붙인다. 사용자에게 SQL 붙여넣기를 시키지 않는다.
+  적용 전에 `docs/db-test/run.sh`로 로컬 검증부터. 다른 Supabase 프로젝트(기존 312goal)는 건드리지 않는다.
+- 함수가 돌려주는 칸을 바꾸면 `create or replace`가 실패하므로 그 앞에 `drop function if exists`를 둔다.
+- 앱은 테이블에 직접 쓰지 않고 함수를 부른다: `create_group`, `join_group`, `get_invite_preview`(비로그인 가능), `submit_checkin`, `send_nudge`.
+- 화면용 집계: `group_week_board`(이번 주 보드·순위·무소식 일수), `my_stats`, `my_weeks`(52주 칸), `group_week_summary`(주간 결산).
+- 직접 쓰기는 이것만 허용: profiles(본인), groups 이름·목표(그룹장), group_members.season_goal·나가기(본인), checkins 삭제(본인), reactions(본인), push_tokens(본인).
+- 함수 오류 코드(`PHOTO_NOT_TODAY`, `ALREADY_NUDGED`, `GROUP_FULL` 등) → 문구는 `src/lib/errors.ts`. 새 코드를 만들면 둘 다 고친다.
+- 랭킹(B안, 사용자 확정): `rank_weeks` = 최근 끝난 4주(4주 전~지난주) 중 주간 목표를 채운 주 수(0~4, 연속 아니어도 됨). 높은 순, 같으면 시즌 누적 많은 순. 이번 주는 진행 중이라 넣지 않는다. (`streak_weeks` 연속 달성 주 수는 마이 화면 참고용으로만 남김)
+- 스키마를 바꾸면 `docs/db-test/run.sh`로 로컬 Postgres에서 검증한다.
+- 환경변수: `.env.example` → `.env.local` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
+
+## 배포 (Cloudflare Pages)
+
+- 프로젝트 `haenya` → https://haenya.pages.dev (계정 56c12d77403c9e5d75ef71350ae5aad4). 같은 계정의 `312goal` 프로젝트는 별개(저장소 `312goal/` 폴더만 배포) — 했냐 작업 중에 건드리지 않는다.
+- GitHub `jrchun/312goal` 연결. **배포 브랜치 `main`**, 기준 폴더 `haenya`, 빌드 `npm run build:web`, 결과 `dist`, 빌드 감시 경로 `haenya/*`(다른 폴더가 바뀌면 다시 빌드 안 함). main에 들어가면 자동 배포.
+- 환경 변수: NODE_VERSION=22, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY(publishable), EXPO_PUBLIC_SITE_URL, EXPO_PUBLIC_KAKAO_REST_KEY, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET(Secret, 사용자가 대시보드에서 입력).
+- `functions/` 폴더는 Cloudflare Pages Functions(서버 코드). 같은 주소의 `/api/...`로 돌아간다.
+- Cloudflare Pages는 `node_modules`라는 이름의 폴더를 올리지 않는다 → `build:web`이 `scripts/fix-web-assets.mjs`로 `dist/assets/node_modules`를 `assets/_m`으로 옮긴다.
+- 웹 글꼴: 제목 Black Han Sans는 직접 올린 `public/fonts/black-han-sans.woff2`(한글 전체 185KB, preload + font-display:block — 얇은 기본 글꼴로 보였다가 굵게 바뀌던 문제, 사용자 제보 2026-11-10), 본문 Gothic A1은 Google Fonts(`src/app/+html.tsx`). 앱은 폰트 파일(`src/lib/fonts.native.ts`). 스타일에는 `...font.display`처럼 펼쳐 쓴다(웹은 굵기를 fontWeight로).
+- `+html.tsx`는 `useServerDocumentContext()`의 headNodes·bodyNodes를 꼭 넣는다(빠지면 JS·스타일이 안 들어가 화면이 깨짐).
+- Claude는 Cloudflare API(api.cloudflare.com, Pages 편집 토큰, 프록시 자동 주입)로 프로젝트 설정·배포 상태를 확인한다.
+- 이 주소는 카카오 콘솔(플랫폼 Web, 앱 대표 도메인)과 Supabase Redirect URLs(`https://haenya.pages.dev/**`)에 등록돼 있어야 로그인이 된다.
+  Supabase 로그인 설정 변경은 Claude가 직접 못 한다(안전장치) → 사용자가 대시보드에서.
+
+## 명령
+
+```bash
+npm run web          # 개발 서버 (브라우저)
+npm run build:web    # 정적 export → dist/
+npm run typecheck    # 타입 검사
+npx serve dist       # export 결과 확인
+```
