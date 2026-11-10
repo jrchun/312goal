@@ -295,7 +295,12 @@ export default function Home() {
       ) : null}
       {weekly.length > 1 ? (
         <View style={styles.poke}>
-          {notToday.length ? (
+          {notToday.length && !doneToday ? (
+            // 찌르기는 오늘 내가 인증해야 열린다 (DB CHECKIN_FIRST, 사용자 결정 2026-11-10)
+            <Text style={[type.sentence, { color: color.black }]}>
+              {`오늘 안 한 사람 ${notToday.length}명. 너부터 인증하면 찌를 수 있다.`}
+            </Text>
+          ) : notToday.length ? (
             <Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={openPicker} />
           ) : (
             <Text style={[type.sentence, { color: color.black }]}>오늘은 다 했다.</Text>

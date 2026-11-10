@@ -520,6 +520,11 @@ begin
   if not exists (select 1 from public.group_members where group_id = p_group_id and user_id = p_to_user) then
     raise exception 'TARGET_NOT_IN_GROUP';
   end if;
+  -- 오늘 내가 인증해야 찌를 수 있다 (사용자 결정 2026-11-10: "너는 했냐?")
+  if not exists (select 1 from public.checkins c where c.group_id = p_group_id and c.user_id = uid
+                 and c.check_date = d and c.counted) then
+    raise exception 'CHECKIN_FIRST' using hint = '오늘 인증하면 찌를 수 있다.';
+  end if;
 
   insert into public.nudges (group_id, from_user, to_user, nudge_date)
   values (p_group_id, uid, p_to_user, d)
@@ -543,6 +548,11 @@ declare
 begin
   if uid is null then raise exception 'NOT_LOGGED_IN'; end if;
   if not public.is_group_member(p_group_id) then raise exception 'NOT_A_MEMBER'; end if;
+  -- 오늘 내가 인증해야 찌를 수 있다 (사용자 결정 2026-11-10: "너는 했냐?")
+  if not exists (select 1 from public.checkins c where c.group_id = p_group_id and c.user_id = uid
+                 and c.check_date = d and c.counted) then
+    raise exception 'CHECKIN_FIRST' using hint = '오늘 인증하면 찌를 수 있다.';
+  end if;
   if not exists (
     select 1 from public.group_week_board(p_group_id) b
     where b.user_id <> uid and b.last_check_date is distinct from d

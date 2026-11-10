@@ -5,6 +5,7 @@
 const messages: Record<string, string> = {
   PHOTO_NOT_TODAY: '오늘 찍은 사진만 된다.',
   ALREADY_NUDGED: '오늘은 이미 찔렀다.',
+  CHECKIN_FIRST: '오늘 인증하면 찌를 수 있다.',
   NOBODY_TO_NUDGE: '오늘은 다 했다. 찌를 사람이 없다.',
   CANNOT_NUDGE_SELF: '자기는 못 찌른다.',
   TARGET_NOT_IN_GROUP: '우리 그룹 사람이 아니다.',

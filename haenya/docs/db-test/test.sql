@@ -60,6 +60,10 @@ select my_nudges_today(:'gid') as "오늘 찌른 사람";
 select * from send_group_nudge(:'gid') as "다 같이 찌르기(오늘 안 한 사람만)";
 select pg_temp.try(format('select send_group_nudge(%L)', :'gid')) as "다 같이 또";
 select my_nudges_today(:'gid') ->> 'all' as "다 같이 했음(true 기대)";
+select pg_temp.as_user('c');
+select pg_temp.try(format('select send_nudge(%L, %L)', :'gid', pg_temp.uid('d'))) as "오늘 인증 안 한 사람 찌르기(CHECKIN_FIRST)";
+select pg_temp.try(format('select send_group_nudge(%L)', :'gid')) as "인증 안 하고 다 같이(CHECKIN_FIRST)";
+select pg_temp.as_user('a');
 
 \echo '== 6. 권한 (RLS)'
 reset role;
