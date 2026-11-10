@@ -139,6 +139,9 @@
 - 카드는 canvas로 직접 그린다(`src/lib/cards.web.ts`): 인증 스토리 1080×1920(`makeStoryCard`), 나 했다 1200×1200(`makeDidSquareCard`), 재촉 1200×1200(`makeNudgeCard`). 글꼴은 그리기 전에 `document.fonts.load`로 불러온다.
 - 카톡: Kakao JS SDK 2.8.4(`src/lib/kakao.web.ts`, integrity 고정) → `Share.uploadImage`로 카드 올림 → `Share.sendDefault` 피드. 링크는 `/home`. 키는 `EXPO_PUBLIC_KAKAO_JS_KEY`(공개 값).
   카카오 콘솔: JavaScript SDK 도메인 + **제품 링크 관리 → 웹 도메인**에 사이트 주소가 있어야 한다.
+- **사파리 등 카톡 밖 브라우저:** 카드 만들기·올리기를 기다린 뒤 `sendDefault`를 부르면 "사람이 누른 순간"이 지나 아이폰이 카톡을 못 열고 talk-apps.kakao.com "카카오톡이 실행되지 않나요?" 화면이 뜬다(사용자 제보 2026-11-10).
+  → 준비가 끝나면 `KakaoSendSheet`("카드 준비됐다." + 미리보기 + [카톡으로 보내기])를 띄우고, 그 버튼을 누르는 순간 바로 `sendDefault`(`src/lib/kakao.web.ts`의 `kakaoPendingStore`). 카톡 안 브라우저(UA에 KAKAOTALK)는 문제없어서 바로 보낸다. 취소하면 `Error('CANCELLED')`.
+  다른 창(찌르기 창 등) 위에 띄우면 뒤에 숨으니, 먼저 그 창을 닫는다.
 - 인스타: Web Share API로 파일 공유(`src/lib/share.web.ts`), 안 되면(카톡 인앱 등) `SaveImageSheet`로 이미지를 띄우고 "길게 눌러 저장" 안내.
 - 이름 부르기는 받침에 따라 `callName()`(민지야/고은아), 순서는 `ordinalWord()`(첫/두/세 번째) — `src/lib/korean.ts`.
 

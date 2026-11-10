@@ -75,6 +75,10 @@ export default function CheckinDone() {
         buttonTitle: '나도 인증하러 가기',
       });
     } catch (e) {
+      if (e instanceof Error && e.message === 'CANCELLED') {
+        setBusy(null);
+        return;
+      }
       console.warn('kakao share failed', e);
       setNotice({ text: '카톡 공유가 안 열렸다. 카드를 저장해서 직접 보내.', tone: 'error' });
     }

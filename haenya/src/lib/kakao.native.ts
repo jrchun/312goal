@@ -4,3 +4,6 @@ export async function shareCardToKakao(_o: {
 }): Promise<void> {
   throw new Error('앱 카톡 공유는 2단계에서 지원');
 }
+
+export type KakaoPending = { preview: string; send: () => void; cancel: () => void };
+export const kakaoPendingStore = { get: (): KakaoPending | null => null, subscribe: (_l: () => void) => () => undefined };

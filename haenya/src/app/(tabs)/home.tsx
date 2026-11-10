@@ -97,13 +97,17 @@ export default function Home() {
 
   /** 재촉 카드를 카톡으로. 안 되면 문장 + 링크 공유 */
   const shareNudge = async (card: Parameters<typeof makeNudgeCard>[0], title: string, description: string, done: string) => {
+    setPicker(false); // 찌르기 창을 먼저 닫아야 "카드 준비됐다" 창이 그 뒤에 숨지 않는다
     try {
       const image = await makeNudgeCard(card);
       await shareCardToKakao({ image, title, description, link: `${siteUrl()}/home`, buttonTitle: '눌러서 인증하기' });
       setNotice({ text: done, tone: 'info' });
-      setPicker(false);
       return;
     } catch (e) {
+      if (e instanceof Error && e.message === 'CANCELLED') {
+        setNotice({ text: '찔렀다. 카톡은 안 보냈다.', tone: 'info' });
+        return;
+      }
       console.warn('nudge card share failed', e);
     }
     const text = `${title} ${description} ${siteUrl()}/home`;
