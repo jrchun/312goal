@@ -23,9 +23,7 @@ import { askFeedView, FeedEvent, feedKey, feedText, feedTime, loadFeed } from '.
 import { isAnnual, paceSentence, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
 import type { BoardRow, WeekSummary } from '../../lib/types';
-import { color, line, space, type } from '../../theme';
-
-const V = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('v')) || 'a'; // TEMP 시안 비교
+import { color, space, type } from '../../theme';
 
 /** 홈 — "오늘 했냐?"에 답하는 화면. 이번 주 n/목표 + 인증 버튼 + 이번 주 순위 + 무소식 찌르기 */
 export default function Home() {
@@ -280,7 +278,7 @@ export default function Home() {
       </Text>
 
       <View style={styles.cta}>
-        {canPoke && V !== 'b' ? (
+        {canPoke ? (
           // 인증한 날: 한 장 더 / 찌르기를 한 줄에 (빨강은 찌르기 하나)
           <View style={styles.ctaPair}>
             <View style={styles.ctaHalf}><Button label="한 장 더" variant="secondary" arrow={false} onPress={() => router.push('/checkin')} /></View>
@@ -293,20 +291,22 @@ export default function Home() {
             onPress={() => router.push('/checkin')}
           />
         )}
-        {pokeLine && V !== 'b' ? <Text style={[type.caption, styles.pokeLine]}>{pokeLine}</Text> : null}
+        {/* 찌르기 안내는 인증 버튼에 딸린 말 → 버튼 바로 아래 (순위·소식 사이에 두면 구분이 흐려진다) */}
+        {pokeLine ? <Text style={[type.caption, styles.pokeLine]}>{pokeLine}</Text> : null}
       </View>
 
-      {V === 'c' ? <Rule /> : null}
-      <View style={[styles.sectionHead, V === 'a' && styles.strip]}>
-        <Text style={[type.label, { color: V === 'a' ? color.cream : color.black }]}>{annual ? '올해 순위 · 목표 대비' : '이번 주 순위'}</Text>
+      {/* 구획마다 6px 검정 선 + 제목 줄: 순위 / 소식 (사용자 확정 2026-11-11) */}
+      <Rule />
+      <View style={styles.sectionHead}>
+        <Label>{annual ? '올해 순위 · 목표 대비' : '이번 주 순위'}</Label>
         {hiddenCount > 0 ? (
           <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setExpanded((v) => !v)}>
-            <Text style={[type.caption, { color: V === 'a' ? color.cream : color.black }, V !== 'a' && styles.under]}>{expanded ? '접기' : `외 ${hiddenCount}명 더 보기`}</Text>
+            <Text style={[type.caption, styles.under]}>{expanded ? '접기' : `외 ${hiddenCount}명 더 보기`}</Text>
           </Pressable>
         ) : null}
       </View>
       <View>
-        {shown.map((r, i) => (
+        {shown.map((r) => (
           <RankRow
             key={r.user_id}
             name={r.nickname}
@@ -314,20 +314,12 @@ export default function Home() {
             isMe={r.is_me}
             daysSilent={r.days_silent}
             compact
-            noTopLine={V === 'a' && i === 0}
           />
         ))}
-        {V === 'b' ? <Rule weight="row" /> : null}
+        {news.length ? null : <Rule weight="row" />}
       </View>
       {weekly.length === 1 ? (
         <Text style={[type.caption, styles.alone]}>아직 혼자다. 친구부터 끌어들이자.</Text>
-      ) : null}
-      {V === 'b' && weekly.length > 1 ? (
-        canPoke ? (
-          <View style={styles.pokeB}><Button variant="poke" label={`찌르기 · 오늘 안 한 사람 ${notToday.length}명`} arrow onPress={openPicker} /></View>
-        ) : pokeLine ? (
-          <View style={styles.pokeBox}><Text style={[type.caption, { color: color.black }]}>{pokeLine}</Text></View>
-        ) : null
       ) : null}
       {notice ? (
         <View style={styles.notice}>
@@ -342,17 +334,17 @@ export default function Home() {
             askFeedView();
             router.navigate('/group');
           }}
-          style={[styles.news, V === 'c' && styles.newsBlock]}
+          style={styles.news}
         >
-          {V === 'b' ? <Rule /> : null}
-          <View style={[styles.sectionHead, V === 'a' && styles.strip]}>
-            <Text style={[type.label, { color: V === 'b' ? color.black : color.cream }]}>소식</Text>
-            <Text style={[type.caption, { color: V === 'b' ? color.black : color.cream }]}>전체 →</Text>
+          <Rule />
+          <View style={styles.sectionHead}>
+            <Label>소식</Label>
+            <Text style={[type.caption, { color: color.black }]}>전체 →</Text>
           </View>
           {news.map((n) => (
             <View key={n.e.id} style={styles.newsRow}>
-              <Text style={[type.caption, styles.newsText, { color: V === 'c' ? color.cream : n.warn ? color.textRed : color.black }]} numberOfLines={1}>{n.text}</Text>
-              <Text style={[type.caption, V === 'c' && { color: color.cream }]}>{feedTime(n.e.created_at)}</Text>
+              <Text style={[type.caption, styles.newsText, { color: n.warn ? color.textRed : color.black }]} numberOfLines={1}>{n.text}</Text>
+              <Text style={type.caption}>{feedTime(n.e.created_at)}</Text>
             </View>
           ))}
         </Pressable>
@@ -374,7 +366,6 @@ export default function Home() {
 const styles = StyleSheet.create({
   // 웹은 주소창·아래 막대만큼 화면이 짧다(아이폰 Safari 약 690px) → 홈은 제목·숫자를 조금 줄여 한 화면에 맞춘다
   headline: { color: color.red, fontSize: 124, lineHeight: 124 * 0.85, paddingBottom: space(1) },
-  topTight: { marginBottom: -space(1) },
   progress: { fontSize: 76, lineHeight: 76 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space(4), paddingTop: space(2) },
   progressCol: { flexDirection: 'column', alignItems: 'flex-start', gap: 0 },
@@ -384,14 +375,10 @@ const styles = StyleSheet.create({
   ctaHalf: { flex: 1 },
   pokeLine: { color: color.black },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: space(6) },
-  strip: { backgroundColor: color.black, paddingHorizontal: space(2) },
   under: { textDecorationLine: 'underline' },
   alone: { paddingTop: space(3) },
-  pokeB: { paddingTop: space(2), alignItems: 'flex-start' },
-  pokeBox: { marginTop: space(2), borderWidth: line.row, borderColor: color.black, paddingHorizontal: space(2), paddingVertical: space(2) },
   notice: { paddingTop: space(2) },
   news: { paddingTop: space(2), paddingBottom: space(1), gap: 2 },
-  newsBlock: { backgroundColor: color.black, paddingHorizontal: space(2), marginTop: space(3), paddingTop: space(1) },
   newsRow: { flexDirection: 'row', gap: space(3), alignItems: 'baseline' },
   newsText: { flex: 1 },
   summary: { backgroundColor: color.black, padding: space(4), gap: space(2), marginTop: space(3) },
