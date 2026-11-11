@@ -11,7 +11,8 @@ import { deleteCheckin } from '../../lib/account';
 import { checkDate, weekStart } from '../../lib/dates';
 import { useCache } from '../../lib/cache';
 import { thumbOf } from '../../lib/photos';
-import { loadMyTab, MyTab, myKey } from '../../lib/tabData';
+import { loadBoard, loadGroupTab, loadMyTab, MyTab, myKey } from '../../lib/tabData';
+import { loadFeed } from '../../lib/feed';
 import { displayName, useSession } from '../../lib/session';
 import { color, font, line, space, type } from '../../theme';
 
@@ -148,6 +149,12 @@ export default function My() {
           const p = photos.find((x) => x.id === v.id);
           if (!p) return;
           await deleteCheckin(p, keepCount);
+          // 홈 숫자·그룹 사진·소식도 새로 (마이 탭은 아래 load)
+          if (group) {
+            loadBoard(group.id).catch(() => undefined);
+            loadGroupTab(group.id).catch(() => undefined);
+            loadFeed(group.id).catch(() => undefined);
+          }
           // 지운 뒤에도 보기는 그대로 — 다음 사진이 그 자리에 온다. 마지막 한 장이었으면 저절로 닫힌다
           await load();
         }}

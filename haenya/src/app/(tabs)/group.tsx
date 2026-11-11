@@ -12,10 +12,11 @@ import { TopBar } from '../../components/TopBar';
 import { checkDate } from '../../lib/dates';
 import { errorMessage } from '../../lib/errors';
 import { copyOrShareInvite } from '../../lib/invite';
+import { deleteCheckin } from '../../lib/account';
 import { useCache } from '../../lib/cache';
 import { FeedEvent, feedClock, feedDay, feedKey, feedText, loadFeed, takeFeedView } from '../../lib/feed';
 import { thumbOf } from '../../lib/photos';
-import { GroupTab, groupKey, loadGroupTab } from '../../lib/tabData';
+import { GroupTab, groupKey, loadBoard, loadGroupTab, loadMyTab } from '../../lib/tabData';
 import { useSession } from '../../lib/session';
 import { isAnnual, seasonPace } from '../../lib/season';
 import { supabase } from '../../lib/supabase';
@@ -68,9 +69,13 @@ export default function Group() {
           thumb: urls[thumbOf(p.photo_path)],
           title: names[p.user_id] ?? '',
           subtitle: `${Number(m)}월 ${Number(d)}일${p.date_verified ? '' : ' · 날짜 미확인'}`,
+          // 내 사진은 여기서도 지울 수 있다(마이 탭과 같은 동작, 사용자 요청 2026-11-11).
+          // 이번 주 사진 목록이라 같은 날 내 사진은 다 들어 있다 → 그날 인정된 단 한 장이면 "횟수도 뺄까?"
+          canDelete: p.user_id === me,
+          askCount: p.user_id === me && p.counted && !photos.some((o) => o.id !== p.id && o.user_id === me && o.check_date === p.check_date),
         };
       }),
-    [photos, urls, names],
+    [photos, urls, names, me],
   );
 
   const invite = async () => {
@@ -177,7 +182,21 @@ export default function Group() {
         </>
       ) : null}
 
-      <PhotoViewer photos={viewerPhotos} startId={open} onClose={() => setOpen(null)} />
+      <PhotoViewer
+        photos={viewerPhotos}
+        startId={open}
+        onClose={() => setOpen(null)}
+        onDelete={async (v, keepCount) => {
+          const p = photos.find((x) => x.id === v.id);
+          if (!p || !group) return;
+          await deleteCheckin(p, keepCount);
+          // 지운 뒤에도 보기는 그대로 — 다음 사진이 그 자리에. 홈 숫자·마이 탭·소식도 새로
+          await loadGroupTab(group.id);
+          loadBoard(group.id).catch(() => undefined);
+          loadFeed(group.id).catch(() => undefined);
+          if (me) loadMyTab(group.id, me).catch(() => undefined);
+        }}
+      />
     </Screen>
   );
 }
