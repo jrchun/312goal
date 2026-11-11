@@ -292,3 +292,16 @@ select invite_code as xcode, id as xgid from create_group('혼자방') \gset
 select counted from submit_checkin(:'xgid', :'xgid' || '/' || pg_temp.uid('m') || '/a.jpg', now());
 select pg_temp.try(format('select leave_group(%L)', :'xgid')) as "혼자 나가기(그룹 삭제) ok";
 reset role; select count(*) as "지워진 그룹 소식 0" from group_events where group_id = :'xgid';
+
+\echo '== 22. 인증 사진만 지우기 (횟수 유지)'
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', md5('dev2'), false);
+select season_count as "지우기 전 누적" from group_week_board(:'dgid') where is_me;
+select id as pcid from checkins where group_id = :'dgid' and user_id = auth.uid() and counted \gset
+select pg_temp.try(format('select remove_checkin_photo(%L)', :'pcid')) as "사진만 지우기 ok";
+select season_count as "누적 그대로", week_count as "이번 주 그대로" from group_week_board(:'dgid') where is_me;
+select jsonb_array_length(my_tab(:'dgid') -> 'photos') as "내 사진 목록에서 빠짐(0)";
+select jsonb_array_length(group_tab(:'dgid') -> 'checkins') as "그룹 사진에서도 빠짐";
+select kind, data - 'actor_name' - 'date' as data from group_feed(:'dgid', 1);
+select pg_temp.try(format('select remove_checkin_photo(%L)', :'pcid')) as "두 번은 안 됨(ERR)";
+select set_config('request.jwt.claim.sub', md5('dev1'), false);
+select pg_temp.try(format('select remove_checkin_photo(%L)', :'pcid')) as "남의 인증은 안 됨(ERR)";

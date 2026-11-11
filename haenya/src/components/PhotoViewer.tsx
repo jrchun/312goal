@@ -15,6 +15,8 @@ export type ViewerPhoto = {
   title: string; // 위 가운데 굵게: "민지" 또는 "11월 9일"
   subtitle?: string; // 그 아래 작게: "11월 9일 · 날짜 미확인"
   canDelete?: boolean;
+  /** 지울 때 "횟수도 뺄까?"를 물을지 (그날 인정된 단 한 장일 때. 사진만 저장된 것·같은 날 다른 사진이 있으면 횟수가 안 변해서 안 묻는다) */
+  askCount?: boolean;
 };
 
 const THUMB_W = 36;
@@ -28,7 +30,7 @@ const NEAR = 2;
  *  위: 가운데 이름·날짜 작게, 오른쪽 작은 ✕
  *  가운데: 사진 전체(밝게=크림·어둡게=검정 바탕, 잘리지 않게). 좌우로 밀면 앞뒤 사진 — 브라우저 기본 "스크롤 딱 맞춤"이라 손가락 따라 부드럽다
  *  아래: 같은 목록의 다른 사진 작은 줄. 누르면 그 사진으로
- *  내 사진이면 줄 위에 작은 글자 "이 인증 지우기"(두 번 눌러야 지움)
+ *  내 사진이면 줄 위에 작은 글자 "이 인증 지우기"(두 번 눌러야 지움). 횟수가 걸린 사진이면 "횟수도 뺄까?" → [횟수도 뺀다] [사진만 지운다]
  */
 export function PhotoViewer({
   photos, startId, onClose, onDelete,
@@ -37,7 +39,8 @@ export function PhotoViewer({
   /** 처음 열 사진. null이면 닫힘 */
   startId: string | null;
   onClose: () => void;
-  onDelete?: (photo: ViewerPhoto) => Promise<void>;
+  /** keepCount: 사진만 지우고 횟수는 남긴다 */
+  onDelete?: (photo: ViewerPhoto, keepCount: boolean) => Promise<void>;
 }) {
   const { width: w } = useWindowDimensions();
   // 휴대폰 밝게/어둡게 설정을 따른다 (사진 앨범처럼, 주소창·하단 메뉴와 같은 색 — 사용자 요청 2026-11-10)
@@ -119,6 +122,18 @@ export function PhotoViewer({
 
   const photo = photos[Math.min(index, photos.length - 1)];
 
+  const remove = async (keepCount: boolean) => {
+    if (!photo || !onDelete) return;
+    setBusy(true);
+    try {
+      await onDelete(photo, keepCount);
+      setConfirm(false);
+    } catch {
+      setError('안 지워졌다. 다시 해봐.');
+    }
+    setBusy(false);
+  };
+
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={close}>
       <SafeAreaView style={[styles.root, { backgroundColor: bg }]} edges={['top', 'bottom']}>
@@ -163,26 +178,34 @@ export function PhotoViewer({
           {photo?.canDelete && onDelete ? (
             <View style={styles.deleteBox}>
               {error ? <Text style={[type.caption, { color: dark ? color.highlight : color.textRed }]}>{error}</Text> : null}
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy}
-                onPress={async () => {
-                  if (!confirm) return setConfirm(true);
-                  setBusy(true);
-                  try {
-                    await onDelete(photo);
-                    setConfirm(false);
-                  } catch {
-                    setError('안 지워졌다. 다시 해봐.');
-                  }
-                  setBusy(false);
-                }}
-                style={styles.deleteTouch}
-              >
-                <Text style={[type.caption, styles.underline, { color: fg }]}>
-                  {busy ? '지우는 중.' : confirm ? '한 번 더 누르면 지운다' : '이 인증 지우기'}
-                </Text>
-              </Pressable>
+              {confirm && photo.askCount && !busy ? (
+                // 횟수가 걸린 사진: 횟수도 뺄지 묻는다 (사용자 결정 2026-11-11)
+                <>
+                  <Text style={[type.caption, { color: fg }]}>횟수도 뺄까?</Text>
+                  <View style={styles.choiceRow}>
+                    <Pressable accessibilityRole="button" onPress={() => remove(false)} style={styles.deleteTouch}>
+                      <Text style={[type.caption, styles.underline, { color: fg }]}>횟수도 뺀다</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => remove(true)} style={styles.deleteTouch}>
+                      <Text style={[type.caption, styles.underline, { color: fg }]}>사진만 지운다</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => setConfirm(false)} style={styles.deleteTouch}>
+                      <Text style={[type.caption, { color: fg }]}>그만</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={() => (confirm ? remove(false) : setConfirm(true))}
+                  style={styles.deleteTouch}
+                >
+                  <Text style={[type.caption, styles.underline, { color: fg }]}>
+                    {busy ? '지우는 중.' : confirm ? '한 번 더 누르면 지운다' : '이 인증 지우기'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           ) : null}
           {photos.length > 1 ? (
@@ -225,6 +248,7 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: '100%' },
   bottom: { width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center', paddingBottom: space(2) },
   deleteBox: { alignItems: 'center', gap: space(1) },
+  choiceRow: { flexDirection: 'row', justifyContent: 'center' },
   deleteTouch: { minHeight: layout.minTouch, justifyContent: 'center', paddingHorizontal: space(4) },
   underline: { textDecorationLine: 'underline' },
   strip: { flexGrow: 0, paddingTop: space(2) },
