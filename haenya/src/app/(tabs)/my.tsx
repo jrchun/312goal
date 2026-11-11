@@ -67,6 +67,8 @@ export default function My() {
           title: `${Number(m)}월 ${Number(d)}일`,
           subtitle: notes.join(' · ') || undefined,
           canDelete: true,
+          // 그날 인정된 단 한 장이면 지울 때 "횟수도 뺄까?"를 묻는다
+          askCount: p.counted && !photos.some((o) => o.id !== p.id && o.check_date === p.check_date),
         };
       }),
     [photos, urls],
@@ -142,10 +144,10 @@ export default function My() {
         photos={viewerPhotos}
         startId={open}
         onClose={() => setOpen(null)}
-        onDelete={async (v) => {
+        onDelete={async (v, keepCount) => {
           const p = photos.find((x) => x.id === v.id);
           if (!p) return;
-          await deleteCheckin(p);
+          await deleteCheckin(p, keepCount);
           // 지운 뒤에도 보기는 그대로 — 다음 사진이 그 자리에 온다. 마지막 한 장이었으면 저절로 닫힌다
           await load();
         }}

@@ -139,6 +139,8 @@ create table if not exists public.checkins (
   counted       boolean not null,            -- 횟수 인정 여부 (같은 날 두 번째부터 false)
   created_at    timestamptz not null default now()
 );
+-- 사진만 지우고 횟수는 남긴 인증 (사용자 결정 2026-11-11: 지울 때 "횟수도 뺄까?"에 아니라고 하면). 사진 목록에서 빠진다
+alter table public.checkins add column if not exists photo_removed boolean not null default false;
 -- 같은 사람·같은 그룹·같은 날 인정은 1건만 (동시에 두 번 눌러도 막힘)
 create unique index if not exists checkins_one_counted_per_day
   on public.checkins (group_id, user_id, check_date) where counted;
@@ -846,7 +848,7 @@ returns jsonb language sql stable as $$
   cs as (
     select c.id, c.user_id, c.check_date, c.photo_path, c.date_verified, c.counted, c.created_at
     from public.checkins c, wk
-    where c.group_id = p_group_id and c.check_date >= wk.d
+    where c.group_id = p_group_id and c.check_date >= wk.d and not c.photo_removed
   )
   select jsonb_build_object(
     'board', coalesce((select jsonb_agg(to_jsonb(b)) from public.group_week_board(p_group_id) b), '[]'::jsonb),
@@ -863,7 +865,7 @@ returns jsonb language sql stable as $$
     'weeks', coalesce((select jsonb_agg(to_jsonb(w) order by w.week) from public.my_weeks(p_group_id) w), '[]'::jsonb),
     'photos', coalesce((select jsonb_agg(to_jsonb(c) order by c.created_at desc) from (
         select id, user_id, check_date, photo_path, date_verified, counted, created_at
-        from public.checkins where group_id = p_group_id and user_id = auth.uid()
+        from public.checkins where group_id = p_group_id and user_id = auth.uid() and not photo_removed
         -- 내 사진은 전부 보여준다(사용자 결정). 화면은 작은 사진 + 화면 가까이 올 때만 받기라 많아도 가볍다
         order by created_at desc) c), '[]'::jsonb)
   )
@@ -914,6 +916,22 @@ begin
   perform set_config('haenya.bulk', '1', true);
   delete from public.checkins where group_id = p_group and user_id = p_uid;
   delete from public.group_members where group_id = p_group and user_id = p_uid;
+end $$;
+
+-- 인증 사진만 지우고 횟수는 남긴다 (사용자 결정 2026-11-11). 사진 파일은 앱이 먼저 Storage에서 지운다.
+-- 횟수를 남긴 채 사진을 없애는 일이라 소식에 남긴다(감시용).
+create or replace function public.remove_checkin_photo(p_checkin_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  c public.checkins;
+begin
+  if auth.uid() is null then raise exception 'NOT_LOGGED_IN'; end if;
+  select * into c from public.checkins where id = p_checkin_id and user_id = auth.uid() and not photo_removed;
+  if not found then raise exception 'NOT_FOUND'; end if;
+  update public.checkins set photo_removed = true where id = c.id;
+  if c.counted then
+    perform public.log_event(c.group_id, 'photo_remove', c.user_id, null, jsonb_build_object('date', c.check_date));
+  end if;
 end $$;
 
 -- 그룹 나가기: 내 인증 기록도 그 그룹에서 지운다
@@ -1232,6 +1250,7 @@ grant execute on function
   public.reset_member_pin(uuid, uuid),
   public.leave_group(uuid),
   public.delete_my_account(),
+  public.remove_checkin_photo(uuid),
   public.create_group(text, int, int),
   public.join_group(text),
   public.submit_checkin(uuid, text, timestamptz),

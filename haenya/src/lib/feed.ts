@@ -77,6 +77,10 @@ export function feedText(e: FeedEvent): { text: string; warn?: boolean } | null 
       const [, m, day] = String(d.date ?? '').split('-');
       return { text: `${subj(a)} ${Number(m)}월 ${Number(day)}일 인증을 지웠다.` };
     }
+    case 'photo_remove': {
+      const [, m, day] = String(d.date ?? '').split('-');
+      return { text: `${subj(a)} ${Number(m)}월 ${Number(day)}일 인증 사진을 지웠다. 횟수는 그대로.` };
+    }
     case 'group_rename':
       return { text: `그룹 이름 ${d.from} → ${d.to}.` };
     case 'weekly_goal':

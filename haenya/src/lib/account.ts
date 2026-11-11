@@ -19,10 +19,16 @@ async function removeMyPhotos(groupId: string, userId: string) {
 }
 
 /** 인증 하나 지우기 (사진 파일 + 기록). 인정된 것이면 같은 날 다음 사진이 인정으로 올라간다(DB 트리거) */
-export async function deleteCheckin(c: { id: string; photo_path: string }) {
+/**
+ * 인증 지우기. keepCount = 사진만 지우고 횟수는 남긴다(사용자 결정 2026-11-11: 지울 때 "횟수도 뺄까?"를 묻는다).
+ * 사진 파일 먼저(Storage) → DB. keepCount면 인증 기록은 남기고 사진 목록에서만 빠진다(remove_checkin_photo)
+ */
+export async function deleteCheckin(c: { id: string; photo_path: string }, keepCount = false) {
   const { error: e1 } = await supabase.storage.from(CHECKIN_BUCKET).remove([c.photo_path, thumbOf(c.photo_path)]);
   if (e1) throw new Error('PHOTO_DELETE_FAILED');
-  const { error } = await supabase.from('checkins').delete().eq('id', c.id);
+  const { error } = keepCount
+    ? await supabase.rpc('remove_checkin_photo', { p_checkin_id: c.id })
+    : await supabase.from('checkins').delete().eq('id', c.id);
   if (error) throw new Error(error.message);
 }
 
