@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Label } from '../../components/Form';
 import { PhotoGrid } from '../../components/PhotoGrid';
@@ -127,7 +127,11 @@ export default function My() {
       <View style={styles.section}>
         <View style={styles.sectionHead}>
           <Label>내 인증샷</Label>
-          <Text style={type.caption}>눌러서 크게 보기·지우기</Text>
+          {photos.length ? (
+            <Pressable accessibilityRole="link" hitSlop={12} onPress={() => router.push('/clip')}>
+              <Text style={[type.caption, { color: color.black }]}>내 영상 보기 →</Text>
+            </Pressable>
+          ) : null}
         </View>
         {photos.length ? (
           <PhotoGrid
