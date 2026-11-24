@@ -9,7 +9,7 @@ const KEY = 'haenya:clip-toast';
 const SHOW_MS = 8000;
 
 /**
- * 홈 아래쪽 알림 "내 영상 나왔다." — 하루 한 번, 올해 사진이 1장 이상일 때만. 누르면 /clip.
+ * 홈 아래쪽 알림 "내 영상 나왔다." — 형광펜 분홍("나" 표시 색) + 검정 테두리(사용자 확정 2026-11-24). 하루 한 번, 올해 사진이 1장 이상일 때만. 누르면 /clip.
  * 이 기능을 모르는 사람이 많을 테니 들어올 때 알려 준다 (사용자 요청 2026-11-24).
  */
 export function ClipToast({ data }: { data: MyTab | undefined | null }) {
@@ -45,10 +45,11 @@ export function ClipToast({ data }: { data: MyTab | undefined | null }) {
           }}
         >
           <Text style={styles.title}>내 영상 나왔다. →</Text>
-          <Text style={[type.caption, { color: color.cream }]}>올해 인증샷 {count}장을 한 번에. 눌러서 보기.</Text>
+          <Text style={[type.caption, { color: color.black }]}>올해 인증샷 {count}장을 한 번에. 눌러서 보기.</Text>
+          <Text style={[type.caption, { color: color.black }]}>다시 보려면 마이 → 내 영상 보기.</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="알림 닫기" hitSlop={8} onPress={() => setShow(false)} style={styles.x}>
-          <Text style={[type.sentence, { color: color.cream }]}>✕</Text>
+          <Text style={[type.sentence, { color: color.black }]}>✕</Text>
         </Pressable>
       </View>
     </View>
@@ -57,8 +58,8 @@ export function ClipToast({ data }: { data: MyTab | undefined | null }) {
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: space(3), alignItems: 'center', paddingHorizontal: layout.gutter },
-  toast: { width: '100%', maxWidth: layout.maxWidth - layout.gutter * 2, flexDirection: 'row', alignItems: 'center', backgroundColor: color.black },
+  toast: { width: '100%', maxWidth: layout.maxWidth - layout.gutter * 2, flexDirection: 'row', alignItems: 'center', backgroundColor: color.highlight, borderWidth: 2, borderColor: color.black },
   body: { flex: 1, paddingVertical: space(3), paddingLeft: space(4), gap: 2 },
-  title: { ...font.display, fontSize: 21, lineHeight: 26, color: color.cream },
+  title: { ...font.display, fontSize: 21, lineHeight: 26, color: color.black },
   x: { width: layout.minTouch, height: layout.minTouch, alignItems: 'center', justifyContent: 'center' },
 });
