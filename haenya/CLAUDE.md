@@ -46,6 +46,7 @@
 - 시작하기(`/login`): 성·이름·숫자 4자리·약관 한 화면 → `registerDevice()`(`src/lib/device-auth.ts`): `/api/register`가 가짜 이메일(무작위@users.haenya.app)+비밀번호를 주고 `supabase.auth.signUp`. 이 브라우저는 계속 자동 로그인.
 - 다른 그룹 계정으로 로그인된 채 초대 링크를 열면: 막지 않고 이 그룹 동그라미를 보여준다 → 누르면 이 브라우저에서만 로그아웃(`signOut({scope:'local'})`) 후 내 자리로.
 - 초대 링크 화면에 멤버 이름 동그라미가 바로 보인다 → 누르면 `/restore?code=&user=`로 숫자 입력, 4자리를 다 누르면 자동으로 들어간다.
+- **초대 코드 없이(`/restore`, 사용자 결정 2026-11-24):** 그룹 목록(`restore_groups`: 이름·인원, 누구나 볼 수 있음 — 사용자가 감수)에서 고르기 → 멤버 동그라미(`restore_candidates_by_group`) → 4자리 → `/home`. 초대 코드는 안 돌려주므로 목록으로는 **되찾기만**(새 가입·미리 만든 자리 첫 입장은 초대 링크로만). "초대 링크·코드로 찾기"로 예전 방식.
 - 나 이미 있어(`/restore?code=`): 초대 코드로 멤버 목록(`restore_candidates`) → 이름 고르고 4자리 → `/api/restore`가 DB `verify_pin`(5번 틀리면 15분 잠금)으로 확인 → 같은 비밀번호를 다시 만들어 `signInWithPassword`.
 - 비밀번호 = HMAC-SHA256(Cloudflare Secret `HAENYA_AUTH_SECRET`, 이메일). **⚠️ 이 Secret을 바꾸면 모든 사용자의 되찾기가 깨진다. 절대 바꾸지 말 것.**
 - 숫자 4자리는 `user_pins`(bcrypt, 앱에서 직접 접근 불가). 그룹장이 `reset_member_pin`으로 임시 숫자 발급 → 그 멤버는 들어오면 새 숫자를 정해야 한다(`is_temp`).

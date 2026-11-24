@@ -305,3 +305,7 @@ select kind, data - 'actor_name' - 'date' as data from group_feed(:'dgid', 1);
 select pg_temp.try(format('select remove_checkin_photo(%L)', :'pcid')) as "두 번은 안 됨(ERR)";
 select set_config('request.jwt.claim.sub', md5('dev1'), false);
 select pg_temp.try(format('select remove_checkin_photo(%L)', :'pcid')) as "남의 인증은 안 됨(ERR)";
+
+-- 초대 코드 없이 되찾기: 그룹 목록 + 그룹의 멤버 (코드는 안 나온다, claimable 항상 false)
+select name, member_count from restore_groups() order by name;
+select display_name, can_pin, claimable from restore_candidates_by_group((select id from groups order by created_at limit 1)) order by 1;
