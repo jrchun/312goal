@@ -44,7 +44,7 @@ export function ClipToast({ data }: { data: MyTab | undefined | null }) {
             router.push('/clip');
           }}
         >
-          <Text style={styles.title}>내 영상 나왔다. →</Text>
+          <Text style={styles.title}>내 영상 나왔다.</Text>
           <Text style={[type.caption, { color: color.black }]}>올해 인증샷 {count}장을 한 번에. 눌러서 보기.</Text>
           <Text style={[type.caption, { color: color.black }]}>다시 보려면 마이 → 내 영상 보기.</Text>
         </Pressable>
