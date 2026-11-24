@@ -30,7 +30,7 @@ export type NudgeCardInput = {
   daysSilent: number;
 };
 
-async function ensureFonts(text: string) {
+export async function ensureFonts(text: string) {
   if (typeof document === 'undefined' || !('fonts' in document)) return;
   await Promise.all([
     document.fonts.load(`100px ${DISPLAY}`, text),
@@ -63,14 +63,16 @@ function toBlob(c: HTMLCanvasElement): Promise<Blob> {
 }
 
 /** 사진을 꽉 채워 자르기 (object-fit: cover) */
-function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) {
-  const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-  const dw = img.naturalWidth * s;
-  const dh = img.naturalHeight * s;
+export function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement | ImageBitmap, w: number, h: number) {
+  const iw = 'naturalWidth' in img ? img.naturalWidth : img.width;
+  const ih = 'naturalHeight' in img ? img.naturalHeight : img.height;
+  const s = Math.max(w / iw, h / ih);
+  const dw = iw * s;
+  const dh = ih * s;
   ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
 
-type Run = { text: string; color: string };
+export type Run = { text: string; color: string };
 type StickerOpts = {
   x: number;
   y: number; // 왼쪽 위 기준 (anchor right 이면 x는 오른쪽 끝)
@@ -87,7 +89,7 @@ type StickerOpts = {
 };
 
 /** 단색 블록 스티커. 돌리기 전 크기를 돌려준다 */
-function sticker(ctx: CanvasRenderingContext2D, o: StickerOpts) {
+export function sticker(ctx: CanvasRenderingContext2D, o: StickerOpts) {
   const lines: Run[][] = Array.isArray(o.runs[0]) ? (o.runs as Run[][]) : [o.runs as Run[]];
   ctx.font = o.font;
   const lineH = o.size * (o.lineGap ?? 1.15);

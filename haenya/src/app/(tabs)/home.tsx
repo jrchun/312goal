@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCache } from '../../lib/cache';
-import { boardKey, loadBoard, loadGroupTab, loadMyTab } from '../../lib/tabData';
+import { boardKey, loadBoard, loadGroupTab, loadMyTab, MyTab, myKey } from '../../lib/tabData';
+import { ClipToast } from '../../components/ClipToast';
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
@@ -38,6 +39,7 @@ export default function Home() {
   const [sheet, setSheet] = useState<string | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
 
+  const myData = useCache<MyTab>(group && session ? myKey(group.id, session.user.id) : null);
   const rows = useCache<BoardRow[]>(group ? boardKey(group.id) : null) ?? null;
   const feed = useCache<FeedEvent[]>(group ? feedKey(group.id) : null);
   // 홈에는 최신 소식 2줄만 (사용자 결정 2026-11-10). 누르면 그룹 탭 소식으로
@@ -241,6 +243,7 @@ export default function Home() {
   };
 
   return (
+    <View style={styles.wrap}>
     <Screen>
       {summary && summary.member_count > 0 ? (
         <View style={styles.summary}>
@@ -360,10 +363,14 @@ export default function Home() {
         onClose={() => setPicker(false)}
       />
     </Screen>
+    {/* 내 영상 알림: 하루 한 번, 올해 사진이 있으면 (사용자 요청 2026-11-24) */}
+    <ClipToast data={myData} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: { flex: 1 },
   // 웹은 주소창·아래 막대만큼 화면이 짧다(아이폰 Safari 약 690px) → 홈은 제목·숫자를 조금 줄여 한 화면에 맞춘다
   // paddingTop: 줄 높이(0.85)가 글자보다 낮아 윗부분이 잘린다(한 줄 제한 = 넘침 숨김) → 위에 여유를 둔다
   headline: { color: color.red, fontSize: 124, lineHeight: 124 * 0.85, paddingTop: space(3), paddingBottom: space(1) },
