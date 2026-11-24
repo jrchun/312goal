@@ -11,7 +11,8 @@
 type Env = { KAKAO_REST_KEY?: string; KAKAO_CLIENT_SECRET?: string };
 type Ctx = { request: Request; env: Env };
 
-const ALLOWED_ORIGINS = ['https://haenya.pages.dev', 'http://localhost:8081'];
+// 새 주소(haenya.woongstudio.com)로 옮길 준비: 두 주소 모두 허용(옛 주소는 옮긴 뒤에도 예비로 남는다).
+const ALLOWED_ORIGINS = ['https://haenya.pages.dev', 'https://haenya.woongstudio.com', 'http://localhost:8081'];
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });

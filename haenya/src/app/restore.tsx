@@ -16,6 +16,9 @@ import type { RestoreCandidate } from '../lib/types';
 import { useScreenFocused } from '../lib/useScreenFocused';
 import { color, layout, line, space, type } from '../theme';
 
+// 안내 문구용 대표 주소(빌드 때 들어가는 EXPO_PUBLIC_SITE_URL). 새 주소로 옮기면 그 값만 바꾼다.
+const SITE_HOST = (process.env.EXPO_PUBLIC_SITE_URL || 'https://haenya.pages.dev').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
 type GroupItem = { group_id: string; name: string; member_count: number };
 
 /** 링크나 코드에서 초대 코드 8자리만 뽑기 */
@@ -134,7 +137,7 @@ export default function Restore() {
         </View>
       ) : !found ? (
         <View style={styles.form}>
-          <Field label="초대 링크 또는 코드" value={codeInput} onChangeText={setCodeInput} autoCapitalize="characters" placeholder="haenya.pages.dev/join/ABCD2345" />
+          <Field label="초대 링크 또는 코드" value={codeInput} onChangeText={setCodeInput} autoCapitalize="characters" placeholder={`${SITE_HOST}/join/ABCD2345`} />
           <Notice tone="error">{codeInput && !parseCode(codeInput) ? '코드는 8자리다.' : ''}</Notice>
           <Button variant="secondary" label="찾기" disabled={!parseCode(codeInput)} onPress={() => setCode(parseCode(codeInput))} />
         </View>
