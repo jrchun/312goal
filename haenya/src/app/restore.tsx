@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
 import { Field, Notice, PinField } from '../components/Form';
 import { MemberCircles } from '../components/MemberCircles';
@@ -14,7 +14,9 @@ import { nextRoute, useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
 import type { RestoreCandidate } from '../lib/types';
 import { useScreenFocused } from '../lib/useScreenFocused';
-import { color, space, type } from '../theme';
+import { color, layout, line, space, type } from '../theme';
+
+type GroupItem = { group_id: string; name: string; member_count: number };
 
 /** 링크나 코드에서 초대 코드 8자리만 뽑기 */
 function parseCode(input: string): string {
@@ -35,6 +37,14 @@ export default function Restore() {
     if (params.code) setCode(parseCode(params.code));
   }, [params.code]);
   const [codeInput, setCodeInput] = useState('');
+  // 초대 코드 없이: 그룹 목록에서 고르기 (사용자 결정 2026-11-24). 목록에서는 되찾기만 — 새 가입은 초대 링크로
+  const [groups, setGroups] = useState<GroupItem[] | null>(null);
+  const [groupId, setGroupId] = useState('');
+  const [byCode, setByCode] = useState(false);
+  useEffect(() => {
+    if (params.code || groups) return;
+    supabase.rpc('restore_groups').then(({ data, error }) => (error ? setError('그룹 목록을 못 불러왔다. 새로고침해.') : setGroups((data as GroupItem[]) ?? [])));
+  }, [params.code, groups]);
   const [list, setList] = useState<RestoreCandidate[] | null>(null);
   const [picked, setPicked] = useState<RestoreCandidate | null>(null);
   const [pin, setPin] = useState('');
@@ -42,16 +52,22 @@ export default function Restore() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!code) return;
+    if (!code && !groupId) return;
     setList(null);
-    supabase.rpc('restore_candidates', { p_code: code }).then(({ data }) => {
+    const q = code
+      ? supabase.rpc('restore_candidates', { p_code: code })
+      : supabase.rpc('restore_candidates_by_group', { p_group: groupId });
+    q.then(({ data }) => {
       const rows = (data as RestoreCandidate[]) ?? [];
       setList(rows);
       // 초대 화면에서 동그라미를 누르고 왔으면 바로 숫자 입력
       const pre = rows.find((r) => r.user_id === params.user);
       if (pre) setPicked(pre);
     });
-  }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [code, groupId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const found = !!code || !!groupId;
+  const after = code ? `/join/${code}` : '/home';
 
   const focused = useScreenFocused();
   if (focused && !s.loading && s.session) return <Redirect href={nextRoute(s) as never} />;
@@ -63,7 +79,7 @@ export default function Restore() {
     try {
       await restoreWithPin(picked.user_id, value);
       const state = await s.refresh();
-      router.replace(nextRoute(state, `/join/${code}`) as never);
+      router.replace(nextRoute(state, after) as never);
     } catch (e) {
       setError(errorMessage(e));
       setPin('');
@@ -91,10 +107,32 @@ export default function Restore() {
       <Text style={styles.title}>{picked ? `${picked.given_name ?? picked.display_name}?` : '너 누구?'}</Text>
       <Rule />
       <Text style={[type.sentence, styles.sentence]}>
-        {picked ? (picked.claimable ? '처음 왔다. 너 맞으면 들어가서 숫자 4자리 정하자.' : picked.can_pin ? '숫자 4자리 누르면 바로 들어간다.' : '카카오로 가입한 계정이다.') : code ? '우리 그룹에서 너를 눌러.' : '우리 그룹 초대 링크나 코드를 넣어.'}
+        {picked ? (picked.claimable ? '처음 왔다. 너 맞으면 들어가서 숫자 4자리 정하자.' : picked.can_pin ? '숫자 4자리 누르면 바로 들어간다.' : '카카오로 가입한 계정이다.') : found ? '우리 그룹에서 너를 눌러.' : byCode ? '우리 그룹 초대 링크나 코드를 넣어.' : '우리 그룹 골라.'}
       </Text>
 
-      {!code ? (
+      {!found && !byCode ? (
+        <View style={styles.groups}>
+          {groups === null && !error ? <Notice>찾는 중.</Notice> : null}
+          {groups?.map((g) => (
+            <Pressable
+              key={g.group_id}
+              accessibilityRole="button"
+              accessibilityLabel={`${g.name} 그룹`}
+              onPress={() => {
+                setGroupId(g.group_id);
+                setError('');
+              }}
+              style={styles.groupRow}
+            >
+              <Text style={[type.rankName, styles.groupName]} numberOfLines={1}>{g.name}</Text>
+              <Text style={[type.sentence, { color: color.black }]}>{g.member_count}명 →</Text>
+            </Pressable>
+          ))}
+          <View style={styles.byCode}>
+            <Button variant="text" label="초대 링크·코드로 찾기" onPress={() => setByCode(true)} />
+          </View>
+        </View>
+      ) : !found ? (
         <View style={styles.form}>
           <Field label="초대 링크 또는 코드" value={codeInput} onChangeText={setCodeInput} autoCapitalize="characters" placeholder="haenya.pages.dev/join/ABCD2345" />
           <Notice tone="error">{codeInput && !parseCode(codeInput) ? '코드는 8자리다.' : ''}</Notice>
@@ -145,12 +183,14 @@ export default function Restore() {
           ) : (
             <>
               <Text style={[type.sentence, { color: color.black }]}>카카오로 가입한 계정이다. 카카오로 이어가자.</Text>
-              <Button label="카카오로 이어가기" onPress={() => signInWithKakao(`/join/${code}`).catch(() => setError('카카오 로그인이 안 열렸다.'))} />
+              <Button label="카카오로 이어가기" onPress={() => signInWithKakao(after).catch(() => setError('카카오 로그인이 안 열렸다.'))} />
             </>
           )
         ) : null}
         {picked ? (
           <Button variant="text" label="다른 이름 고르기" onPress={() => { setPicked(null); setPin(''); setError(''); }} />
+        ) : groupId ? (
+          <Button variant="text" label="다른 그룹 고르기" onPress={() => { setGroupId(''); setList(null); setError(''); }} />
         ) : (
           <Button variant="text" label="처음이야. 새로 시작" onPress={() => router.replace((code ? `/login?next=/join/${code}` : '/login') as never)} />
         )}
@@ -164,6 +204,10 @@ const styles = StyleSheet.create({
   sentence: { color: color.black, paddingTop: space(4) },
   form: { gap: space(6), paddingTop: space(7), alignItems: 'stretch' },
   list: { paddingTop: space(8) },
+  groups: { paddingTop: space(6) },
+  groupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(3), minHeight: layout.minTouch + space(4), borderBottomWidth: line.row, borderBottomColor: color.black },
+  groupName: { color: color.black, flexShrink: 1 },
+  byCode: { paddingTop: space(4), alignItems: 'flex-start' },
   actions: { marginTop: 'auto', gap: space(2), paddingVertical: space(6) },
   center: { textAlign: 'center' },
 });

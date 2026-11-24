@@ -1025,6 +1025,32 @@ language sql stable security definer set search_path = public, auth as $$
   order by m.joined_at
 $$;
 
+-- 초대 코드 없이 되찾기 (사용자 결정 2026-11-24: "너 누구?"에서 그룹 목록을 보고 고른다. 그룹 이름·인원이 누구에게나 보이는 것은 사용자가 감수)
+-- 초대 코드는 돌려주지 않는다 → 목록에서는 이미 멤버인 사람의 되찾기만. 새 가입·미리 만든 자리 첫 입장은 초대 링크로만
+create or replace function public.restore_groups()
+returns table (group_id uuid, name text, member_count int)
+language sql stable security definer set search_path = public as $$
+  select g.id, g.name, count(m.user_id)::int
+  from public.groups g join public.group_members m on m.group_id = g.id
+  group by g.id, g.name
+  order by max(m.joined_at) desc, g.name
+$$;
+
+drop function if exists public.restore_candidates_by_group(uuid);
+create or replace function public.restore_candidates_by_group(p_group uuid)
+returns table (user_id uuid, family_name text, given_name text, display_name text, can_pin boolean, claimable boolean)
+language sql stable security definer set search_path = public, auth as $$
+  select m.user_id, p.family_name, p.given_name,
+         coalesce(p.family_name || p.given_name, p.nickname),
+         exists (select 1 from public.user_pins u where u.user_id = m.user_id)
+           and exists (select 1 from auth.users a where a.id = m.user_id and a.email like '%@users.haenya.app'),
+         false
+  from public.group_members m
+  join public.profiles p on p.id = m.user_id
+  where m.group_id = p_group
+  order by m.joined_at
+$$;
+
 -- 미리 만든 자리에 처음 들어오기: 초대 코드 + 그 그룹의 미리 만든 멤버(숫자 아직 없음)일 때만 (가짜) 이메일을 돌려준다
 -- → 서버(/api/claim)가 비밀번호를 만들어 로그인 → 앱은 프로필 미완성이라 /login에서 성·이름·숫자·약관을 채운다
 create or replace function public.claim_account(p_user uuid, p_code text)
@@ -1275,7 +1301,7 @@ to authenticated;
 -- 서버(service_role) 전용
 grant execute on function public.kakao_unlink_target(text), public.delete_user_account(uuid) to service_role;
 grant execute on function public.restore_candidates(text), public.verify_pin(uuid, text), public.redeem_transfer_token(text),
-  public.claim_account(uuid, text) to anon, authenticated;
+  public.claim_account(uuid, text), public.restore_groups(), public.restore_candidates_by_group(uuid) to anon, authenticated;
 grant execute on function public.get_invite_preview(text), public.haenya_today(),
   public.to_check_date(timestamptz), public.week_start(date)
 to anon, authenticated;
