@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "name": "했냐",
+  "emoji": "🏃",
+  "summary": "친구끼리 운동 인증. 안 하면 단톡방에서 찔린다.",
+  "category": "건강",
+  "status": "운영중",
+  "public": true,
+  "mode": "supabase",
+  "repo": "jrchun/312goal",
+  "createdAt": "2026-11-09",
+  "updatedAt": "2026-11-25"
+}
