@@ -14,6 +14,9 @@ const FONTS = 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;600;8
  * font-display: block → 받는 동안 잠깐 글자를 숨기고, 받으면 바로 굵게 (최대 3초 뒤엔 기본 글꼴).
  * 파일을 바꾸면 이름도 바꿀 것(1년 캐시). 다시 만들기: pyftsubset …BlackHanSans_400Regular.ttf (한글 음절·자모·ASCII) --flavor=woff2
  */
+// 링크 미리보기(og) 이미지는 전체 주소가 필요하다. 대표 주소는 Cloudflare 환경 변수 EXPO_PUBLIC_SITE_URL(빌드 때 들어감).
+// 새 주소(haenya.woongstudio.com)로 옮길 때 그 값만 바꾸면 된다. 없으면 지금 주소.
+const SITE = (process.env.EXPO_PUBLIC_SITE_URL || 'https://haenya.pages.dev').replace(/\/+$/, '');
 const DISPLAY_FONT = '/fonts/black-han-sans.woff2';
 const DISPLAY_FACE = `@font-face{font-family:'Black Han Sans';src:url(${DISPLAY_FONT}) format('woff2');font-weight:400;font-style:normal;font-display:block}`;
 
@@ -37,7 +40,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:site_name" content="했냐" />
         <meta property="og:title" content="너도 했냐?" />
         <meta property="og:description" content="친구끼리 운동 인증. 사진 한 장이면 끝. 안 하면 단톡방에서 찔린다." />
-        <meta property="og:image" content="https://haenya.pages.dev/og.png" />
+        <meta property="og:image" content={`${SITE}/og.png`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />

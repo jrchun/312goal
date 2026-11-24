@@ -262,6 +262,22 @@
 - 이 주소는 카카오 콘솔(플랫폼 Web, 앱 대표 도메인)과 Supabase Redirect URLs(`https://haenya.pages.dev/**`)에 등록돼 있어야 로그인이 된다.
   Supabase 로그인 설정 변경은 Claude가 직접 못 한다(안전장치) → 사용자가 대시보드에서.
 
+## 새 주소로 옮기기: haenya.woongstudio.com (준비 완료 2026-11-24, 옮기는 날은 아직)
+
+사용자가 `woongstudio.com`을 샀다(같은 Cloudflare 계정). **2027-01-01 오픈 전에** 옮긴다(오픈 뒤면 모두의 로그인이 한꺼번에 풀림).
+- 코드 준비(끝): 카카오 로그인 허용 주소에 새 주소(`functions/api/kakao-token.ts`), 링크 미리보기 이미지·되찾기 안내문은 `EXPO_PUBLIC_SITE_URL`에서 읽음(`+html.tsx`, `restore.tsx`), 초대 링크는 원래 "지금 열린 주소".
+- 넘겨주기 장치 `functions/_middleware.ts`: 환경 변수 `CANONICAL_ORIGIN`이 있을 때만 `haenya.pages.dev`의 화면 주소(GET)를 새 주소로 301. `/api/*`(카카오 웹훅 등)와 미리보기 배포는 안 넘김. 정적 파일은 `public/_routes.json`에서 함수를 거치지 않게 뺐다.
+- **브라우저 저장소는 주소마다 따로**라, 옮기면 모든 사람이 새 주소에서 이름 + 숫자 4자리로 한 번 되찾기를 해야 한다(홈 화면 아이콘도 새로 추가).
+
+옮기는 날 순서(★ 사람):
+1. ★ Cloudflare 대시보드 › Workers 및 Pages › `haenya` › 사용자 지정 도메인 › 설정 › `haenya.woongstudio.com` (같은 계정 도메인이라 DNS는 자동). 이 환경에서 Pages API가 되면 Claude가 한다.
+2. ★ 카카오 콘솔: 플랫폼 Web 사이트 도메인, JavaScript SDK 도메인, 제품 링크 관리 › 웹 도메인, 카카오 로그인 Redirect URI(`/auth/kakao`)에 `https://haenya.woongstudio.com` **추가**(옛 주소는 지우지 않는다).
+3. ★ Supabase › Authentication › URL Configuration: Redirect URLs에 `https://haenya.woongstudio.com/**` 추가, Site URL을 새 주소로.
+4. Pages 환경 변수 `EXPO_PUBLIC_SITE_URL` = `https://haenya.woongstudio.com`, `CANONICAL_ORIGIN` = 같은 값 → 다시 배포(빌드 때 들어가는 값이라 배포가 필요).
+5. 새 주소에서 전체 점검(가입·되찾기·인증·카톡 공유·찌르기), 옛 주소 `/join/코드`가 새 주소로 넘어가는지 확인. 카카오 "공유 디버거"로 미리보기 캐시 지우기(★).
+6. 카카오 연결 해제 웹훅 주소는 옛 주소 그대로 둬도 된다(`/api/*`는 안 넘김). 바꾸려면 콘솔에서 새 주소로.
+7. 멤버들에게 "새 주소에서 이름 + 숫자로 한 번 들어와 달라" 안내(312_2026 그룹).
+
 ## 명령
 
 ```bash
